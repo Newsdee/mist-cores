@@ -112,7 +112,8 @@ end component user_io;
            dout: out std_logic_vector(7 downto 0));
   end component;
 
-  signal CLK_28M, CLK_14M, CLK_2M, PRE_PHASE_ZERO, CLK_12k : std_logic;
+  signal CLK_114M, CLK_28M, CLK_14M, CLK_2M, PRE_PHASE_ZERO, CLK_12k : std_logic;
+  signal clk_div : unsigned(1 downto 0);
   signal IO_SELECT, DEVICE_SELECT : std_logic_vector(7 downto 0);
   signal ADDR : unsigned(15 downto 0);
   signal D, PD : unsigned(7 downto 0);
@@ -160,6 +161,8 @@ end component user_io;
   signal ps2Clk     : std_logic;
   signal ps2Data    : std_logic;
   signal audio      : std_logic;
+  
+  signal pll_locked : std_logic;
 
 begin
 
@@ -186,11 +189,31 @@ begin
 
   pll : entity work.mist_clk 
   port map (
+    areset => '0',
     inclk0 => CLOCK_27(0),
-    c0     => CLK_28M,
-    c1     => CLK_14M,
-    c2     => CLK_12k
+    c0     => CLK_114M,
+    c1     => open,
+    c2     => CLK_12k,
+    locked => pll_locked
     );
+    
+  -- generate 28.6MHz video clock from 114.4MHz main clock by dividing it by 4
+  process(CLK_114M)
+  begin
+    if rising_edge(CLK_114M) then
+      clk_div <= clk_div + 1;
+    end if;
+     
+    CLK_28M <= clk_div(1);
+  end process;
+  
+  -- generate 14.3MHz system clock from 28.6MHz video clock
+  process(CLK_28M)
+  begin
+    if rising_edge(CLK_28M) then
+      CLK_14M <= not CLK_14M;
+    end if;
+  end process;
 
   -- Paddle buttons
   --GAMEPORT <=  "0000" & (not KEY(2 downto 0)) & "0";
