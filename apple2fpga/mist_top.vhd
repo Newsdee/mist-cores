@@ -50,7 +50,7 @@ entity mist_top is
     VGA_VS : out std_logic;                             -- V_SYNC
     VGA_R,                                              -- Red[5:0]
     VGA_G,                                              -- Green[5:0]
-    VGA_B : out unsigned(5 downto 0);                   -- Blue[5:0]
+    VGA_B : out std_logic_vector(5 downto 0);           -- Blue[5:0]
     
     -- Audio
     AUDIO_L,
@@ -62,7 +62,7 @@ end mist_top;
 
 architecture datapath of mist_top is
 
-  constant CONF_STR : string := "apple2;apl;";
+  constant CONF_STR : string := "AppleII+;BAS;";
 
   function to_slv(s: string) return std_logic_vector is 
     constant ss: string(1 to s'length) := s; 
@@ -98,9 +98,10 @@ architecture datapath of mist_top is
            ps2_data : out std_logic
          );
 
-end component user_io;
+  end component user_io;
+  
   component data_io is
-      port(sck: in std_logic;
+    port ( sck: in std_logic;
            ss: in std_logic;
            sdi: in std_logic;
            downloading: out std_logic;
@@ -111,12 +112,20 @@ end component user_io;
            din: in std_logic_vector(7 downto 0);
            dout: out std_logic_vector(7 downto 0));
   end component;
+  
+  component osd
+    port ( pclk, sck, ss, sdi, hs_in, vs_in : in std_logic;
+           red_in, blue_in, green_in : in std_logic_vector(5 downto 0);
+           red_out, blue_out, green_out : out std_logic_vector(5 downto 0);
+           hs_out, vs_out : out std_logic
+         );
+  end component osd;
 
   signal CLK_114M, CLK_28M, CLK_14M, CLK_2M, PRE_PHASE_ZERO, CLK_12k : std_logic;
   signal clk_div : unsigned(1 downto 0);
   signal IO_SELECT, DEVICE_SELECT : std_logic_vector(7 downto 0);
   signal ADDR : unsigned(15 downto 0);
-  signal D, PD : unsigned(7 downto 0);
+  signal D, PD, ram_do, ram_di : unsigned(7 downto 0);
 
   signal ram_we : std_logic;
   signal VIDEO, HBL, VBL, LD194 : std_logic;
@@ -130,6 +139,7 @@ end component user_io;
 
   signal flash_clk : unsigned(22 downto 0) := (others => '0');
   signal power_on_reset : std_logic := '1';
+  signal force_reset : std_logic := '0';
   signal reset : std_logic;
 
   signal track : unsigned(5 downto 0);
@@ -152,6 +162,8 @@ end component user_io;
   signal r : unsigned(9 downto 0);
   signal g : unsigned(9 downto 0);
   signal b : unsigned(9 downto 0);
+  signal hsync : std_logic;
+  signal vsync : std_logic;
   
   signal switches   : std_logic_vector(1 downto 0);
   signal buttons    : std_logic_vector(1 downto 0);
@@ -166,7 +178,7 @@ end component user_io;
 
 begin
 
-  reset <= status(0) or buttons(0) or power_on_reset;
+  reset <= status(0) or buttons(1) or power_on_reset or force_reset;
 
   power_on : process(CLK_14M)
   begin
@@ -223,7 +235,20 @@ begin
   data_io_inst: data_io
     port map(SPI_SCK, SPI_SS2, SPI_DI, downl, size, CLK_14M, ram_we, std_logic_vector(a_ram), di_ram, d_ram);
     
-  di_ram <= std_logic_vector(D) when ram_we = '1' else (others => 'Z');
+  process(downl)
+  begin
+    if(downl = '0') then
+      ram_do <= unsigned(d_ram);
+      ram_di <= D;
+      force_reset <= '0';
+    else
+      ram_do <= (others => 'Z');
+      ram_di <= (others => 'Z');
+      force_reset <= '0';
+    end if;
+  end process;
+  
+  di_ram <= std_logic_vector(ram_di) when ram_we = '1' else (others => 'Z');
   
   core : entity work.apple2 port map (
     CLK_14M        => CLK_14M,
@@ -234,7 +259,7 @@ begin
     ADDR           => ADDR,
     ram_addr       => a_ram,
     D              => D,
-    ram_do         => unsigned(d_ram),
+    ram_do         => ram_do,
     PD             => PD,
     ram_we         => ram_we,
     VIDEO          => VIDEO,
@@ -263,17 +288,13 @@ begin
     VBL        => VBL,
     LD194      => LD194,
     VGA_CLK    => open,
-    VGA_HS     => VGA_HS,
-    VGA_VS     => VGA_VS,
+    VGA_HS     => hsync,
+    VGA_VS     => vsync,
     VGA_BLANK  => open,
     VGA_R      => r,
     VGA_G      => g,
     VGA_B      => b
     );
-    
-  VGA_R <= r(5 downto 0);
-  VGA_G <= g(5 downto 0);
-  VGA_B <= b(5 downto 0);
 
   keyboard : entity work.keyboard port map (
     PS2_Clk  => ps2Clk,
@@ -340,6 +361,24 @@ begin
       clk => CLK_12k,
       ps2_clk => ps2Clk,
       ps2_data => ps2Data
+    );
+    
+  osd_inst : osd
+    port map (
+      pclk => CLK_14M,
+      sdi => SPI_DI,
+      sck => SPI_SCK,
+      ss => SPI_SS3,
+      red_in => std_logic_vector(r(5 downto 0)),
+      green_in => std_logic_vector(g(5 downto 0)),
+      blue_in => std_logic_vector(b(5 downto 0)),
+      hs_in => not hsync,
+      vs_in => not vsync,
+      red_out => VGA_R,
+      green_out => VGA_G,
+      blue_out => VGA_B,
+      hs_out => VGA_HS,
+      vs_out => VGA_VS
     );
 
 --  SRAM_DQ(7 downto 0) <= D when ram_we = '1' else (others => 'Z');
