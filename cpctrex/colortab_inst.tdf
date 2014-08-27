@@ -43,7 +43,7 @@ SUBDESIGN colortab_inst
 VARIABLE
 
 	altsyncram_component : altsyncram WITH (
-			INTENDED_DEVICE_FAMILY = "Cyclone",
+			INTENDED_DEVICE_FAMILY = "Cyclone III",
 			WIDTH_A = 6,
 			WIDTHAD_A = 6,
 			NUMWORDS_A = 64,

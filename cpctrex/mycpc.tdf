@@ -70,6 +70,8 @@ SUBDESIGN mycpc
 	disp					: OUTPUT;
 	vaddr[22..0]			: OUTPUT;
 	pixclk					: OUTPUT;
+  LROMena         : OUTPUT;
+  HROMena         : OUTPUT;
 )
 
 VARIABLE
@@ -77,7 +79,7 @@ VARIABLE
 	1MHZcount[6..0]			:DFF;
 --	cpuclkcount[4..0]	 	:DFF;
 	ioblocki				:ioblock;
-	LROMena, HROMena		:NODE;
+--	LROMena, HROMena		:NODE;
 --	cpuhadr[16..14]			:NODE;
 --	25MHz, 25MHzd			:DFF;
 	16MHz					:TFF;

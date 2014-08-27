@@ -118,7 +118,7 @@ COMPONENT sdram
 		 iowait : IN STD_LOGIC;
 		 Addrin : IN STD_LOGIC_VECTOR(22 DOWNTO 0);
 		 datain : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
-		 fl_data : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
+--		 fl_data : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 		 raddr : IN STD_LOGIC_VECTOR(22 DOWNTO 0);
 		 rdatain : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
 		 sdata : INOUT STD_LOGIC_VECTOR(15 DOWNTO 0);
@@ -134,12 +134,12 @@ COMPONENT sdram
 		 rena : OUT STD_LOGIC;
 		 rioclk : OUT STD_LOGIC;
 		 reset : OUT STD_LOGIC;
-		 fl_ce : OUT STD_LOGIC;
+--		 fl_ce : OUT STD_LOGIC;
 		 rzclk : OUT STD_LOGIC;
 		 ba : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);
 		 dataout : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 		 dqm : OUT STD_LOGIC_VECTOR(3 DOWNTO 0);
-		 fl_addr : OUT STD_LOGIC_VECTOR(20 DOWNTO 0);
+--		 fl_addr : OUT STD_LOGIC_VECTOR(20 DOWNTO 0);
 		 rdata : OUT STD_LOGIC_VECTOR(7 DOWNTO 0);
 		 sd_cs : OUT STD_LOGIC_VECTOR(3 DOWNTO 0);
 		 sdaddr : OUT STD_LOGIC_VECTOR(12 DOWNTO 0);
@@ -205,7 +205,9 @@ COMPONENT mycpc
 		 pixclk : OUT STD_LOGIC;
 		 sdaddr : OUT STD_LOGIC_VECTOR(22 DOWNTO 0);
 		 vaddr : OUT STD_LOGIC_VECTOR(22 DOWNTO 0);
-		 video : OUT STD_LOGIC_VECTOR(15 DOWNTO 0)
+		 video : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+     LROMena : OUT STD_LOGIC;
+     HROMena : OUT STD_LOGIC
 	);
 END COMPONENT;
 
@@ -371,18 +373,50 @@ SIGNAL	SYNTHESIZED_WIRE_19 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
 SIGNAL	SYNTHESIZED_WIRE_21 :  STD_LOGIC;
 SIGNAL	SYNTHESIZED_WIRE_23 :  STD_LOGIC;
 
+signal ramdata : std_logic_vector(7 downto 0);
+signal rom1_out : std_logic_vector(7 downto 0);
+signal rom2_out : std_logic_vector(7 downto 0);
+signal hrom_en : std_logic;
+signal lrom_en : std_logic;
+
 
 BEGIN 
 ide1cs <= SYNTHESIZED_WIRE_1;
 
+  boot_rom1_inst : entity work.sprom
+    generic map
+    (
+      init_file		=> "OS6128.mif",
+      widthad_a		=> 14
+    )
+    port map
+    (
+      clock			=> rzclk,
+      address		=> addr(13 downto 0),
+      q					=> rom1_out
+    );
+   
+  boot_rom2_inst : entity work.sprom
+    generic map
+    (
+      init_file		=> "BASIC1-1.mif",
+      widthad_a		=> 14
+    )
+    port map
+    (
+      clock			=> rzclk,
+      address		=> addr(13 downto 0),
+      q					=> rom2_out
+    );
 
-
+    ramdata <= rom1_out when lrom_en='1' else rom2_out when hrom_en='1' else Ramout;
+    
 b2v_inst : rz80
 PORT MAP(clk => rzclk,
 		 reset => reset,
 		 interrupt => int,
 		 IOdatain => DI,
-		 ramdata => Ramout,
+		 ramdata => ramdata,
 		 IO_WR => iowr,
 		 IO_RD => iord,
 		 intack => SYNTHESIZED_WIRE_11,
@@ -392,6 +426,8 @@ PORT MAP(clk => rzclk,
 		 slower => SYNTHESIZED_WIRE_9,
 		 dataout => DO,
 		 memaddr => addr);
+     
+     
 
 
 b2v_inst1 : ps2mouse
@@ -431,7 +467,7 @@ PORT MAP(sysclk => sysclk,
 		 iowait => iowait,
 		 Addrin => ma,
 		 datain => DO,
-		 fl_data => fl_data,
+--		 fl_data => fl_data,
 		 raddr => raddr,
 		 rdatain => pdata,
 		 sdata => sdata,
@@ -444,12 +480,12 @@ PORT MAP(sysclk => sysclk,
 		 rena => rena,
 		 rioclk => rioclk,
 		 reset => resetin,
-		 fl_ce => fl_ce,
+--		 fl_ce => fl_ce,
 		 rzclk => rzclk,
 		 ba => sd_ba,
 		 dataout => Ramout,
 		 dqm => dqm,
-		 fl_addr => fl_addr,
+--		 fl_addr => fl_addr,
 		 rdata => rdata,
 		 sd_cs => sd_cs,
 		 sdaddr => sd_addr,
@@ -516,7 +552,9 @@ PORT MAP(IOWR => iowr,
 		 pixclk => pixclk,
 		 sdaddr => ma,
 		 vaddr => vaddr,
-		 video => SYNTHESIZED_WIRE_19);
+		 video => SYNTHESIZED_WIRE_19,
+     LROMena => lrom_en,
+     HROMena => hrom_en);
 
 
 b2v_inst3 : rs232

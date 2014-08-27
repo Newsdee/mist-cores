@@ -93,7 +93,7 @@ BEGIN
 
 	altsyncram_component : altsyncram
 	GENERIC MAP (
-		intended_device_family => "Cyclone",
+		intended_device_family => "Cyclone III",
 		operation_mode => "DUAL_PORT",
 		width_a => 5,
 		widthad_a => 5,

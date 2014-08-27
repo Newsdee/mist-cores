@@ -72,9 +72,9 @@ SUBDESIGN sdram
 	rioclk				: OUTPUT;
 	reset				: OUTPUT;
 --Flashcopy
-	fl_data[7..0]		: INPUT;
-	fl_addr[20..0]		: OUTPUT;
-	fl_ce				: OUTPUT;	
+--	fl_data[7..0]		: INPUT;
+--	fl_addr[20..0]		: OUTPUT;
+--	fl_ce				: OUTPUT;	
 	rzclk				: OUTPUT;
 	)
  
@@ -220,11 +220,11 @@ END DEFAULTS;
 	
 	addrsel=addrseli;
 	
-	IF NOT fladdrcnt[21] AND fladdrcnt[0] THEN
-		addr[]=(B"000",fladdrcnt[20..1]);
-		t_sdata[] = (fl_data[],fl_data[]);
-		wr=GND;
-	ELSIF rena THEN	--RISC
+--	IF NOT fladdrcnt[21] AND fladdrcnt[0] THEN
+--		addr[]=(B"000",fladdrcnt[20..1]);
+--		t_sdata[] = (fl_data[],fl_data[]);
+--		wr=GND;
+	IF rena THEN	--RISC
 		addr[]=raddr[];
 		wr=rwr;-- OR NOT reset;
 		t_sdata[] = (rdatain[], rdatain[]); 
@@ -331,21 +331,21 @@ END DEFAULTS;
 						isd_we = VCC;
 				end case; 
 
---Flashcopy
-	resetin.clk=sysclk;
-	resetin=resetas;
-	rasaddr=NOT fladdrcnt[21] OR initstop;
-	fladdrcnt[].ena=NOT initstop AND NOT fladdrcnt[21];
-
---	fladdrcnt[21].prn=NOT initstop;
-	fladdrcnt[21].clrn=resetin;
-	fladdrcnt[20].prn=NOT fladdrcnt[21];	--beim Einschalten wird der gesamte Flash kopiert
-											--bei reset nur ab 40000
-
-	fladdrcnt[19..0].clrn=resetin;
-	fladdrcnt[].clk=rioclk;
-	fladdrcnt[]=fladdrcnt[]+1;
-	fl_addr[]=(GND, fladdrcnt[20..1]);
-	fl_ce=fladdrcnt[21];
+----Flashcopy
+--	resetin.clk=sysclk;
+--	resetin=resetas;
+--	rasaddr=NOT fladdrcnt[21] OR initstop;
+--	fladdrcnt[].ena=NOT initstop AND NOT fladdrcnt[21];
+--
+----	fladdrcnt[21].prn=NOT initstop;
+--	fladdrcnt[21].clrn=resetin;
+--	fladdrcnt[20].prn=NOT fladdrcnt[21];	--beim Einschalten wird der gesamte Flash kopiert
+--											--bei reset nur ab 40000
+--
+--	fladdrcnt[19..0].clrn=resetin;
+--	fladdrcnt[].clk=rioclk;
+--	fladdrcnt[]=fladdrcnt[]+1;
+--	fl_addr[]=(GND, fladdrcnt[20..1]);
+--	fl_ce=fladdrcnt[21];
 
 end;
