@@ -60,7 +60,7 @@ SUBDESIGN mycpc
 	reset					: INPUT;
 	riscview				: INPUT;
 	ramcs					: OUTPUT;
-	1MHz					: OUTPUT;
+	C1MHz					: OUTPUT;
 --	iord					: OUTPUT;
 	int						: OUTPUT;
 --	iowr					: OUTPUT;
@@ -185,7 +185,7 @@ END TABLE;
 	pixclk=NOT crtcnt[1];	
 	
 	1MHZcount[].clk=sysclk;
-	1MHz=NOT 1MHzcount[6];
+	C1MHz=NOT 1MHzcount[6];
 	IF 1MHZcount[]==0 THEN
 		1MHZcount[]=95;
 	ELSE

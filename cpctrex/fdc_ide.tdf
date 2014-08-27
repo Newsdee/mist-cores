@@ -40,7 +40,7 @@ SUBDESIGN fdc_ide
 	intWR				:INPUT;		--internes IO_WR RISC
 	intRD				:INPUT;		--internes IO_RD RISC
 	IO_Adr[15..0]		:INPUT;		--RISC adrbus
-	sWR					:INPUT;--acs[0]		--Signalbildung für externe IOs
+	sWR					:INPUT;--acs[0]		--Signalbildung fï¿½r externe IOs
 	sCE					:INPUT;--sca[1]		--sWR=0 sCE=0 ==> IO_WR=1 IO_RD=1 MDB=TRI
 											--sWR=1 sCE=0 ==> IO_WR=1 IO_RD=1 MDB=Dout
 											--sWR=0 sCE=1 ==> IO_WR=1 IO_RD=0 MDB=Din
@@ -58,7 +58,7 @@ SUBDESIGN fdc_ide
 	Ide2cs				:OUTPUT;
 	IO_WR				:OUTPUT;	--extern IO_WR
 	IO_RD				:OUTPUT;	--extern IO_RD
-	wait				:OUTPUT;
+	swait				:OUTPUT;
 	wrena				:OUTPUT;
 	rs232clk			:OUTPUT;
 	rs232[7..0]			:OUTPUT;
@@ -172,13 +172,13 @@ END DEFAULTS;
 	(Ide1cso, Ide2cso, IdeDatawr[], d_Idea[]).clk=clk;	
 	idea[]=d_idea[];
 
-	bide=	z80addr[15..4]==B"111111010000"			--Primär IDE
---		OR	z80addr[15..4]==B"111111010100"			--Sekundär IDE
+	bide=	z80addr[15..4]==B"111111010000"			--Primï¿½r IDE
+--		OR	z80addr[15..4]==B"111111010100"			--Sekundï¿½r IDE
 		AND  (NOT z80iowr OR NOT z80iord);
 	bidewr=bide AND NOT z80iowr;
 	biderd=bide AND NOT z80iord;
 	
-	wait=NOT waitinit AND waitcnt[]==b"000000" ;
+	swait=NOT waitinit AND waitcnt[]==b"000000" ;
 	waitcnt[]=(waitcnt[4..0], waitinit);
 	
 	(bidewrd, biderdd, bided)=(bidewr, biderd, bide);

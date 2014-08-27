@@ -14,7 +14,7 @@
 
 
 
-QUARTUS_VERSION = "5.0"
+QUARTUS_VERSION = "13.1"
 DATE = "18:55:02  September 28, 2005"
 
 

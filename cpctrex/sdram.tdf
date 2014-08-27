@@ -49,7 +49,7 @@ SUBDESIGN sdram
 	Addrin[22..0]		: INPUT;
 	refresh				: INPUT;
 	oe					: INPUT;
-	vack				: INPUT;		--LH=>nächstes Byte
+	vack				: INPUT;		--LH=>nï¿½chstes Byte
 	speed				: INPUT;		--H=Clone L=Turbo;
 --	iorq				: INPUT;
 	vaddr[22..0]		: INPUT;
@@ -65,7 +65,7 @@ SUBDESIGN sdram
 	cpuclk				: OUTPUT;
 	cpuena				: OUTPUT;
 	crt1MHz				: OUTPUT;
-	wait				: OUTPUT;
+	swait				: OUTPUT;
 	rclk				: OUTPUT;
 	rena				: OUTPUT;
 	rdata[7..0]			: OUTPUT;
@@ -163,7 +163,7 @@ END DEFAULTS;
 	
 	(waitcnt[]).clk=cpuclk;
 	waitcnt[]=waitcnt[]+1;
-	wait=iowait;
+	swait=iowait;
 	
 	(ksd_we, ksd_ras, ksd_cas, state[], initstate[], casaddr, rasaddr, st10, casaddrd, initstop, rzclk).clk =  sysclk;
 	(sdaddr[], dqm[], sd_cs[], vidcache[]).clk= sysclk;
