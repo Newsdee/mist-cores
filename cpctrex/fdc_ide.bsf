@@ -1,0 +1,225 @@
+/*
+WARNING: Do NOT edit the input and output ports in this file in a text
+editor if you plan to continue editing the block that represents it in
+the Block Editor! File corruption is VERY likely to occur.
+*/
+/*
+Copyright (C) 1991-2005 Altera Corporation
+Your use of Altera Corporation's design tools, logic functions 
+and other software and tools, and its AMPP partner logic 
+functions, and any output files any of the foregoing 
+(including device programming or simulation files), and any 
+associated documentation or information are expressly subject 
+to the terms and conditions of the Altera Program License 
+Subscription Agreement, Altera MegaCore Function License 
+Agreement, or other applicable license agreement, including, 
+without limitation, that your use is for the sole purpose of 
+programming logic devices manufactured by Altera and sold by 
+Altera or its authorized distributors.  Please refer to the 
+applicable agreement for further details.
+*/
+(header "symbol" (version "1.1"))
+(symbol
+	(rect 16 16 224 304)
+	(text "fdc_ide" (rect 5 0 41 12)(font "Arial" ))
+	(text "inst" (rect 8 272 25 284)(font "Arial" ))
+	(port
+		(pt 0 32)
+		(input)
+		(text "z80addr[15..0]" (rect 0 0 69 12)(font "Arial" ))
+		(text "z80addr[15..0]" (rect 21 27 90 39)(font "Arial" ))
+		(line (pt 0 32)(pt 16 32)(line_width 3))
+	)
+	(port
+		(pt 0 48)
+		(input)
+		(text "z80iord" (rect 0 0 34 12)(font "Arial" ))
+		(text "z80iord" (rect 21 43 55 55)(font "Arial" ))
+		(line (pt 0 48)(pt 16 48)(line_width 1))
+	)
+	(port
+		(pt 0 64)
+		(input)
+		(text "z80iowr" (rect 0 0 35 12)(font "Arial" ))
+		(text "z80iowr" (rect 21 59 56 71)(font "Arial" ))
+		(line (pt 0 64)(pt 16 64)(line_width 1))
+	)
+	(port
+		(pt 0 80)
+		(input)
+		(text "Z80inData[7..0]" (rect 0 0 76 12)(font "Arial" ))
+		(text "Z80inData[7..0]" (rect 21 75 97 87)(font "Arial" ))
+		(line (pt 0 80)(pt 16 80)(line_width 3))
+	)
+	(port
+		(pt 0 96)
+		(input)
+		(text "clk" (rect 0 0 14 12)(font "Arial" ))
+		(text "clk" (rect 21 91 35 103)(font "Arial" ))
+		(line (pt 0 96)(pt 16 96)(line_width 1))
+	)
+	(port
+		(pt 0 112)
+		(input)
+		(text "intWR" (rect 0 0 30 12)(font "Arial" ))
+		(text "intWR" (rect 21 107 51 119)(font "Arial" ))
+		(line (pt 0 112)(pt 16 112)(line_width 1))
+	)
+	(port
+		(pt 0 128)
+		(input)
+		(text "intRD" (rect 0 0 28 12)(font "Arial" ))
+		(text "intRD" (rect 21 123 49 135)(font "Arial" ))
+		(line (pt 0 128)(pt 16 128)(line_width 1))
+	)
+	(port
+		(pt 0 144)
+		(input)
+		(text "IO_Adr[15..0]" (rect 0 0 66 12)(font "Arial" ))
+		(text "IO_Adr[15..0]" (rect 21 139 87 151)(font "Arial" ))
+		(line (pt 0 144)(pt 16 144)(line_width 3))
+	)
+	(port
+		(pt 0 160)
+		(input)
+		(text "sWR" (rect 0 0 24 12)(font "Arial" ))
+		(text "sWR" (rect 21 155 45 167)(font "Arial" ))
+		(line (pt 0 160)(pt 16 160)(line_width 1))
+	)
+	(port
+		(pt 0 176)
+		(input)
+		(text "sCE" (rect 0 0 21 12)(font "Arial" ))
+		(text "sCE" (rect 21 171 42 183)(font "Arial" ))
+		(line (pt 0 176)(pt 16 176)(line_width 1))
+	)
+	(port
+		(pt 0 192)
+		(input)
+		(text "reset" (rect 0 0 24 12)(font "Arial" ))
+		(text "reset" (rect 21 187 45 199)(font "Arial" ))
+		(line (pt 0 192)(pt 16 192)(line_width 1))
+	)
+	(port
+		(pt 0 208)
+		(input)
+		(text "txd_busy" (rect 0 0 46 12)(font "Arial" ))
+		(text "txd_busy" (rect 21 203 67 215)(font "Arial" ))
+		(line (pt 0 208)(pt 16 208)(line_width 1))
+	)
+	(port
+		(pt 0 224)
+		(input)
+		(text "PBI[7..0]" (rect 0 0 43 12)(font "Arial" ))
+		(text "PBI[7..0]" (rect 21 219 64 231)(font "Arial" ))
+		(line (pt 0 224)(pt 16 224)(line_width 3))
+	)
+	(port
+		(pt 0 240)
+		(input)
+		(text "speed" (rect 0 0 29 12)(font "Arial" ))
+		(text "speed" (rect 21 235 50 247)(font "Arial" ))
+		(line (pt 0 240)(pt 16 240)(line_width 1))
+	)
+	(port
+		(pt 0 256)
+		(input)
+		(text "riscena" (rect 0 0 35 12)(font "Arial" ))
+		(text "riscena" (rect 21 251 56 263)(font "Arial" ))
+		(line (pt 0 256)(pt 16 256)(line_width 1))
+	)
+	(port
+		(pt 208 32)
+		(output)
+		(text "z80outData[7..0]" (rect 0 0 81 12)(font "Arial" ))
+		(text "z80outData[7..0]" (rect 106 27 187 39)(font "Arial" ))
+		(line (pt 208 32)(pt 192 32)(line_width 3))
+	)
+	(port
+		(pt 208 80)
+		(output)
+		(text "Idea[3..0]" (rect 0 0 47 12)(font "Arial" ))
+		(text "Idea[3..0]" (rect 140 75 187 87)(font "Arial" ))
+		(line (pt 208 80)(pt 192 80)(line_width 3))
+	)
+	(port
+		(pt 208 96)
+		(output)
+		(text "Ide1cs" (rect 0 0 33 12)(font "Arial" ))
+		(text "Ide1cs" (rect 154 91 187 103)(font "Arial" ))
+		(line (pt 208 96)(pt 192 96)(line_width 1))
+	)
+	(port
+		(pt 208 112)
+		(output)
+		(text "Ide2cs" (rect 0 0 33 12)(font "Arial" ))
+		(text "Ide2cs" (rect 154 107 187 119)(font "Arial" ))
+		(line (pt 208 112)(pt 192 112)(line_width 1))
+	)
+	(port
+		(pt 208 128)
+		(output)
+		(text "IO_WR" (rect 0 0 36 12)(font "Arial" ))
+		(text "IO_WR" (rect 151 123 187 135)(font "Arial" ))
+		(line (pt 208 128)(pt 192 128)(line_width 1))
+	)
+	(port
+		(pt 208 144)
+		(output)
+		(text "IO_RD" (rect 0 0 34 12)(font "Arial" ))
+		(text "IO_RD" (rect 153 139 187 151)(font "Arial" ))
+		(line (pt 208 144)(pt 192 144)(line_width 1))
+	)
+	(port
+		(pt 208 160)
+		(output)
+		(text "wait" (rect 0 0 18 12)(font "Arial" ))
+		(text "wait" (rect 169 155 187 167)(font "Arial" ))
+		(line (pt 208 160)(pt 192 160)(line_width 1))
+	)
+	(port
+		(pt 208 176)
+		(output)
+		(text "wrena" (rect 0 0 28 12)(font "Arial" ))
+		(text "wrena" (rect 159 171 187 183)(font "Arial" ))
+		(line (pt 208 176)(pt 192 176)(line_width 1))
+	)
+	(port
+		(pt 208 192)
+		(output)
+		(text "rs232clk" (rect 0 0 41 12)(font "Arial" ))
+		(text "rs232clk" (rect 146 187 187 199)(font "Arial" ))
+		(line (pt 208 192)(pt 192 192)(line_width 1))
+	)
+	(port
+		(pt 208 208)
+		(output)
+		(text "rs232[7..0]" (rect 0 0 53 12)(font "Arial" ))
+		(text "rs232[7..0]" (rect 134 203 187 215)(font "Arial" ))
+		(line (pt 208 208)(pt 192 208)(line_width 3))
+	)
+	(port
+		(pt 208 224)
+		(output)
+		(text "rs232stb" (rect 0 0 42 12)(font "Arial" ))
+		(text "rs232stb" (rect 145 219 187 231)(font "Arial" ))
+		(line (pt 208 224)(pt 192 224)(line_width 1))
+	)
+	(port
+		(pt 208 48)
+		(bidir)
+		(text "ridata[7..0]" (rect 0 0 53 12)(font "Arial" ))
+		(text "ridata[7..0]" (rect 134 43 187 55)(font "Arial" ))
+		(line (pt 208 48)(pt 192 48)(line_width 3))
+	)
+	(port
+		(pt 208 64)
+		(bidir)
+		(text "Idedb[15..0]" (rect 0 0 59 12)(font "Arial" ))
+		(text "Idedb[15..0]" (rect 128 59 187 71)(font "Arial" ))
+		(line (pt 208 64)(pt 192 64)(line_width 3))
+	)
+	(drawing
+		(rectangle (rect 16 16 192 272)(line_width 1))
+	)
+)

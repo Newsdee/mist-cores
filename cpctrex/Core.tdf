@@ -1,0 +1,606 @@
+-- Copyright (c) 2005-2006 Tobias Gubener
+-- Subdesign CPC T-REX by TobiFlex
+-- All rights reserved
+--
+-- Redistribution and use in source and synthezised forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+--
+-- Redistributions of source code must retain the above copyright notice,
+-- this list of conditions and the following disclaimer.
+--
+-- Redistributions in synthesized form must reproduce the above copyright
+-- notice, this list of conditions and the following disclaimer in the
+-- documentation and/or other materials provided with the distribution.
+--
+-- Neither the name of the author nor the names of other contributors may
+-- be used to endorse or promote products derived from this software without
+-- specific prior written permission.
+--
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+-- THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-- PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE
+-- LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+-- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+-- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+-- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+-- CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+-- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+-- POSSIBILITY OF SUCH DAMAGE.
+--
+ 
+INCLUDE "ramdata_inst.inc";
+   
+FUNCTION lpm_add_sub (cin, dataa[LPM_WIDTH-1..0], datab[LPM_WIDTH-1..0], add_sub)
+   RETURNS (result[LPM_WIDTH-1..0]);
+       
+SUBDESIGN core
+(
+	prgdata[7..0]									:BIDIR;
+	clk												:INPUT;
+	ramdatain[7..0]									:INPUT;
+	IO_inA[7..0]									:INPUT=VCC;
+	IO_inB[7..0]									:INPUT=VCC;
+	IO_inC[7..0]									:INPUT=VCC;
+	prgadr[22..0], mem_oe, mem_wr					:OUTPUT;
+	IO_WR											:OUTPUT;
+	IO_RD											:OUTPUT;
+	riscena											:INPUT;
+	hsync											:INPUT=VCC;
+	reset											:INPUT=VCC;
+	joy[11..0]										:INPUT=GND;
+	rioclk											:INPUT;
+	vsyncin											:INPUT;
+	inA_stb, inC_stb								:OUTPUT;
+	pal												:OUTPUT;
+	ACS[6..0]										:OUTPUT;
+	startena										:OUTPUT;
+	refresh											:OUTPUT;
+	tmatrixo[7..0]									:OUTPUT;
+)
+
+VARIABLE
+	count[15..0], stat[4..0], befehl[7..0]			:DFFE;
+	n_X[8..0],n_mb[11..0], n_ip[15..0]				:DFFE;
+	exip[15..0], exh, exl							:DFFE;
+ 	ex[3..0], n_flags[2..0]							:DFFE;
+	n_int											:DFFE;
+	n_refresh[6..0]									:DFFE;
+	n_regwr, n_ramdata[7..0]						:NODE;
+	n_count[12..0]									:NODE;
+	n_oe											:NODE;
+	i_ldxn, n_f, n_ov[1..0]							:NODE;
+	i_ldnx, i_ldxhn, n_Xop[7..0]					:NODE;
+	i_jxnz, i_and, i_xor, i_or						:NODE;
+	i_ina, i_inb, i_inc								:NODE;
+	i_adc, i_addn, i_sbc							:NODE;
+	i_cnz, i_xipx, i_mbx, i_exx						:NODE;
+	i_rrx, i_A32, i_flags, i_refresh				:NODE;
+	i_exip, i_addipx								:NODE;
+	i_ipp, n_ipo[15..0], n_ipout[15..0],n_ipcin		:NODE;
+	i_exzp, i_ldip									:NODE;
+	n_tri[7..0]										:TRI;
+
+	regadr[7..0]									:NODE;
+	itrans, iflag									:DFF;
+	inter											:NODE;--:DFFE;
+	intac											:DFFE;
+	intFF											:NODE;
+	Vint, mbvint									:DFF;
+	inA_stb											:DFF;
+	inC_stb											:DFF;
+	pal												:DFFE;
+	n_ergebnis[8..0]								:NODE;
+	add_in[19..0]									:NODE;
+	ACS[6..0]										:DFFE;
+	ixymux											:DFFE;
+	cpumode											:DFFE; 	--0->Z80  1->6502
+	tmatrix[7..0]									:NODE;
+	interrupt				:DFF;
+	intres					:DFFE;
+	int[5..0]				:DFF;
+	keybugfix				:DFFE;
+	ramdata					:ramdata_inst;
+	
+	dktronik[5..0]									:DFFE;
+	dktroniksel[2..0]								:NODE;
+
+
+BEGIN
+DEFAULTS
+	stat[]=GND;
+	stat[].ena=GND;
+	n_X[]=GND;
+	n_X[].ena=GND;
+	n_flags[].ena=GND;
+	n_flags[]=GND;
+	n_refresh[].ena=GND;
+	n_oe=GND;
+	mem_wr=VCC;
+	n_mb[].ena=GND;
+	n_mb[3..1]=GND;
+	n_ip[].ena=GND;
+	n_regwr=GND;
+	n_count[] = 1;
+	ex[].ena=GND;
+	inter=GND;
+	intac=GND;
+	intac.ena=GND;
+	n_int.ena=GND;
+	IO_WR=VCC;
+	inA_stb=VCC;
+	inC_stb=VCC;
+	Vint=VCC;
+	mbvint=VCC;
+	pal.ena=GND;
+	add_in[]=GND;
+	ACS[].ena=GND;
+	ixymux.ena=GND;
+	cpumode.ena=GND;
+	intres.ena=GND;
+	interrupt=GND;
+	keybugfix.ena=GND;
+	refresh=GND;
+	exip[].ena=GND;
+	exh.ena=GND;
+	exl.ena=GND;
+	exh=GND;
+	exl=GND;
+	dktronik[].ena=GND;
+	
+END DEFAULTS;
+--DKtronik RAM
+dktronik[].clrn = reset;
+dktronik[].clk=clk;
+dktronik[]=n_X[5..0];
+TABLE
+  (dktronik[2..0],n_ip[15..14])       	=>      dktroniksel[];
+ 		               	B"00000"        =>      B"000";
+ 		               	B"00001"        =>      B"001";
+ 		               	B"00010"        =>      B"010";
+ 		               	B"00011"        =>      B"011";
+
+ 		               	B"00100"        =>      B"000";
+ 		               	B"00101"        =>      B"001";
+ 		               	B"00110"        =>      B"010";
+ 		               	B"00111"        =>      B"111";
+
+ 		               	B"01000"        =>      B"100";
+ 		               	B"01001"        =>      B"101";
+ 		               	B"01010"        =>      B"110";
+ 		               	B"01011"        =>      B"111";
+
+ 		               	B"01100"        =>      B"000";
+ 		               	B"01101"        =>      B"011";
+ 		               	B"01110"        =>      B"010";
+ 		               	B"01111"        =>      B"111";
+
+ 		               	B"10000"        =>      B"000";
+ 		               	B"10001"        =>      B"100";
+ 		               	B"10010"        =>      B"010";
+ 		               	B"10011"        =>      B"011";
+
+		               	B"10100"        =>      B"000";
+ 		               	B"10101"        =>      B"101";
+ 		               	B"10110"        =>      B"010";
+ 		               	B"10111"        =>      B"011";
+
+ 		               	B"11000"        =>      B"000";
+ 		               	B"11001"        =>      B"110";
+ 		               	B"11010"        =>      B"010";
+ 		               	B"11011"        =>      B"011";
+
+		               	B"11100"        =>      B"000";
+ 		               	B"11101"        =>      B"111";
+ 		               	B"11110"        =>      B"010";
+ 		               	B"11111"        =>      B"011";
+END TABLE;
+
+	count[].clrn = reset;
+	cpumode.clrn = reset;
+	stat[4..1].clrn = reset;
+	stat[0].prn = reset;
+	acs[6].clrn=reset;
+
+	(n_mb[10..8], n_mb[6..5], n_mb[3..0], n_ip[13..9], n_ip[7..3], n_ip[0]).clrn = reset;  --Start bei 9c106
+	(n_mb[7], n_mb[4], n_ip[15..14], n_ip[8], n_ip[2..1]).prn = reset;  --Start bei 9c106
+
+	iflag.clrn = reset; 
+	ex[].clrn = reset;
+	befehl[].clrn = reset;
+
+
+mem_oe=n_oe OR stat[3];-- OR NOT riscena;
+IO_RD=n_oe OR NOT stat[3] OR clk;-- OR NOT riscena;
+startena=n_mb[11];
+
+n_ramdata[] = ramdata.q[];
+ramdata.rdaddress[]=regadr[];
+ramdata.wraddress[]=regadr[];
+ramdata.data[]=n_X[7..0];
+ramdata.wren=n_regwr;
+ramdata.rdclock=NOT rioclk;
+ramdata.wrclock=clk;
+( count[], stat[], n_mb[], befehl[], inA_stb, inC_stb, pal).clk=clk;
+(n_refresh[0], n_int, n_X[], ACS[], ixymux, cpumode).clk=clk;
+( ex[], n_ip[], n_flags[], n_refresh[], intres, keybugfix).clk=clk;
+(exip[],exl,exh).clk=clk;
+exip[]=n_ip[];
+
+befehl[]=ramdatain[];
+n_refresh[]=n_refresh[]+1;
+
+
+		i_addn	= (befehl[7..5] == B"000");		% add X,n %
+		i_jxnz	= (befehl[7..5] == B"001");		% Jnz n & Jz n%
+		i_ldxn	= (befehl[7..5] == B"010");		% ld X,(n) %
+		i_ldnx	= (befehl[7..5] == B"011");		% ld (n),X %
+	
+		i_adc	= (befehl[7..4] == H"8");		% adc X,(n) %
+		i_and	= (befehl[7..4] == H"9");		% and X,(n) %
+		i_xor	= (befehl[7..4] == H"A");		% xor X,(n) %
+		i_ldxhn	= (befehl[7..4] == H"B");		% ld Xh,n %
+		i_sbc	= (befehl[7..4] == H"C");		% sbc X,(n) %
+		i_or	= (befehl[7..4] == H"D");		% or X,(n) %
+
+		i_xipx	= (befehl[7..3] == B"11100");	% E0-LDM X,(IP++)(M1) & <E1-LDM (IP),X> %
+												% E2-LD X,(IP++)  & E3-LD (IP),X  %
+												% E4-LDM X,(IP++) & <E5-LDM (IP),X> %
+												% E6-IN X,(IP++)  & E7-OUT (IP),X %
+
+		i_ina	= (befehl[7..0] == H"E8");		% in PA %
+		i_inb	= (befehl[7..0] == H"E9");		% in PB %
+		i_inc	= (befehl[7..0] == H"EA");		% in PC %
+--		i_ind	= (befehl[7..0] == H"EB");		% set ACS % --nur für Flash im C-One
+
+		i_cnz	= (befehl[7..0] == H"F0");		% wenn C so A=1 %
+		i_A32	= (befehl[7..0] == H"F1");		% JMP A32 %
+		i_flags	= (befehl[7..1] == B"1111001");	% F2-flagsv F3-Flagsp %
+		i_exip	= (befehl[7..1] == B"1111010");	% F4-EX IPL, F5-EX IPH %
+		i_exzp	= (befehl[7..0] == H"F6");		% MK ZP %
+		i_ldip	= (befehl[7..0] == H"F7");		% LD IP %
+
+		i_mbx	= (befehl[7..0] == H"F8");		% LD mb,X %
+		i_exx	= (befehl[7..0] == H"F9");		% ex x %
+		i_ipp	= (befehl[7..1] == B"1111101");	% FA-ip++ & FB-ip-- %
+		i_refresh=(befehl[7..0] == H"FC");		% LD X,R %
+		i_rrx	= (befehl[7..0] == H"FD");		% rrx %
+		i_addipx= (befehl[7..1] == B"1111111");	% FE-ADDS IP,X FF-ADDU PC%
+
+IF befehl[7] THEN
+	n_Xop[]=n_ramdata[7..0];
+ELSE
+	n_Xop[3..0]=befehl[3..0];
+	n_Xop[7..4]=befehl[4];
+END IF;
+
+n_ipcin = NOT (stat[1..0]==B"10" OR NOT befehl[0]);   --IP++ IP-- LD X,(IP)++
+n_ipo[]=(H"00", n_ipcin, n_ipcin, n_ipcin, n_ipcin, n_ipcin, n_ipcin, n_ipcin, VCC);
+
+if stat[1..0]==B"10" OR i_ipp THEN					
+	add_in[17..10]=n_ipo[7..0];
+ELSE
+	add_in[17..10]=n_X[7..0]; 
+END IF;
+
+if stat[1..0]==B"10" OR i_ipp OR i_addipx THEN					
+	add_in[8..0]=(n_ip[7..0], VCC);
+ELSE
+	add_in[19]=(n_X[8] XOR befehl[6]) AND befehl[7];
+	add_in[8..0]=(n_Xop[7..0], NOT befehl[6]);
+END IF;
+
+n_ipout[7..0]=n_ergebnis[7..0];
+n_ipout[15..8]=lpm_add_sub (n_ergebnis[8], n_ip[15..8], n_ipo[15..8], NOT add_in[17] OR (i_addipx AND befehl[0]))
+		   WITH (LPM_WIDTH=8, LPM_REPRESENTATION="UNUSED", LPM_DIRECTION, ONE_INPUT_IS_CONSTANT="YES", LPM_PIPELINE, MAXIMIZE_SPEED);
+
+n_ergebnis[8..0]=lpm_add_sub (add_in[])
+				   WITH (LPM_WIDTH=9, LPM_REPRESENTATION="UNSIGNED", LPM_DIRECTION, ONE_INPUT_IS_CONSTANT, LPM_PIPELINE, MAXIMIZE_SPEED);
+
+IF riscena THEN
+--IF VCC THEN
+	intac.ena=VCC;
+	stat[].ena=VCC;
+	befehl[].ena=NOT stat[1];
+	count[12..0].ena=NOT stat[1];
+
+	CASE stat[1..0] IS
+		WHEN B"10" =>						% ld X,(IP++) %
+			n_ip[]=n_ipout[];
+			n_ip[].ena=VCC;
+			IF stat[3] THEN
+				n_X[7..0]=prgdata[];		--IO
+			ELSE	
+				n_X[7..0]=ramdatain[];		--MEM
+			END IF;	
+			n_X[7..0].ena=VCC;
+			n_refresh[].ena=stat[4];
+		WHEN B"11" =>						% ld (IP),X %
+			n_tri[7..0].in=n_X[7..0];			
+			n_tri[7..0].oe=VCC;
+			n_oe=VCC;
+			IO_WR=NOT stat[3] OR clk;-- OR NOT riscena;
+			mem_wr=stat[3];-- OR NOT riscena;
+
+--DKtronik RAM
+			IF stat[3] AND NOT n_ip[15] AND n_X[7] AND n_X[6] THEN	--MF2-Reg
+				dktronik[].ena=VCC;
+			END IF;
+		WHEN B"00" =>
+			
+			if (i_ldnx) THEN				% ld (n),X %
+				n_regwr=VCC;--NOT ioclk;
+			end if;
+			if (i_adc OR i_sbc OR i_addn) THEN					% adc X,(n), sbc X,(n), add X,n %
+				(n_ov[1..0],n_X[6..5],n_f,n_X[3..0])=n_ergebnis[8..0];
+				n_X[4]=n_f;
+				n_X[8..7]=n_ov[1..0];
+				n_X[].ena=VCC;
+				n_flags[0]=n_X[4] XOR n_Xop[4] XOR n_f; 
+				n_flags[1]=befehl[6] OR (befehl[4] AND NOT befehl[6]);	--N
+				n_flags[2]=n_ov[1] xor n_ov[0] XOR n_X[7] XOR n_Xop[7];	--V, fehlerhaft: cin wird ignoriert
+				n_flags[].ena=VCC;
+			end if;
+			if (i_and) THEN					% and X,(n) %
+				n_X[7..0]=n_X[7..0] AND n_ramdata[7..0];
+				n_X[].ena=VCC;
+				n_flags[0]=VCC;
+				n_flags[].ena=VCC;
+			end if;
+			if (i_xor) THEN					% xor X,(n) %
+				n_X[7..0]=n_X[7..0] XOR n_ramdata[7..0];
+				n_X[].ena=VCC;
+				n_flags[].ena=VCC;
+			end if;
+			if (i_or) THEN					% or X,(n) %
+				n_X[7..0]=n_X[7..0] OR n_ramdata[7..0];
+				n_X[].ena=VCC;
+				n_flags[].ena=VCC;
+			end if;
+			if (i_rrx) THEN					% rrx %
+				n_X[7..0]=n_X[8..1];
+				n_X[8]=n_X[0];
+				n_X[].ena=VCC;
+			end if;
+			if (i_cnz) THEN					% C=X0 und X0=C %
+				n_X[0]=n_X[8];
+				n_X[8]=n_X[0];
+				n_X[1..0].ena=VCC;			--N & C
+				n_X[4].ena=VCC;				--H
+				n_X[8].ena=VCC;
+			end if;
+			if (i_flags) THEN				% flags %
+				n_X[0]=n_X[8];
+				n_X[6]=n_X[7..0]==H"00";
+				n_X[5]=GND;
+				n_X[4]=n_flags[0];
+				n_X[3]=GND;
+				if befehl[0] THEN
+					n_X[2]=NOT (((n_X[0] xor n_X[1]) xor (n_X[2] xor n_X[3])) xor ((n_X[4] xor n_X[5]) xor (n_X[6] xor n_X[7])));
+				else
+					n_X[2] = n_flags[2];
+				end if;
+				n_X[1]=n_flags[1];			--N
+				n_X[6..0].ena=VCC;
+			end if;
+			if (i_ldxhn) THEN				% ld Xh,n %
+				n_X[7..4]=befehl[3..0];
+				n_X[3..0]=GND;
+				n_X[].ena=VCC;
+			end if;
+			if i_xipx THEN					% ld X,(IP),X %
+				stat[] = (NOT (befehl[2] or befehl[1] or befehl[0]), befehl[2] and befehl[1] ,befehl[1],VCC,befehl[0]);	--M1,IO,dir,,,	
+			end if;
+			if i_mbx THEN
+				n_mb[3..0] = n_X[7..4];		
+				n_mb[3..0].ena=n_X[3..0]==H"0";		-- ld mb,X 			&X0
+				acs[5..2] = n_X[7..4] XOR B"1010";	--D1-erase 1K100; 71-nWS
+				acs[5..2].ena = n_X[3..0]==H"1";	--bigbootfunktion   &X1
+				n_mb[7..4] = n_X[7..4];				--RAMROM Page		&XC
+				n_mb[7..4].ena=n_X[3..0] ==H"C";	--n_X[3] AND n_X[2];
+				n_mb[11..8] = n_X[7..4];			--RISC Page			&XA
+				n_mb[11..8].ena=n_X[3..0]==H"A";	--n_X[3] AND n_X[1];
+				IF n_X[3..0]==H"9" THEN
+					n_int=n_X[4];				% DI EI %
+					n_int.ena=NOT n_X[7] AND NOT n_X[6] AND NOT n_X[5];  	--H-aktiv DI=&09 EI=&19
+					ixymux=n_X[4];
+					ixymux.ena=NOT n_X[7] AND NOT n_X[6] AND n_X[5];		--H-aktiv IX=&29 IY=&39
+					cpumode=n_X[4];
+					cpumode.ena=NOT n_X[7] AND n_X[6] AND n_X[5];			--&69-Z80  &79-6502
+					mbvint = n_X[7] OR NOT n_X[6] OR n_X[5];		   		--L-aktiv &49 und &59
+					Vint = n_X[7] OR NOT n_X[6] OR n_X[5] OR n_X[4];		--L-aktiv &49
+					pal=n_X[4];										
+					pal.ena=n_X[7] AND NOT n_X[6] AND NOT n_X[5];			--H-aktiv 8..9
+					acs[6]=n_X[4];										
+					acs[6].ena=n_X[7] AND NOT n_X[6] AND n_X[5];			--H-aktiv A..B
+					acs[1..0]=n_X[5..4];
+					acs[1..0].ena=n_X[7] AND n_X[6];						--H-aktiv C..F
+  				END IF;
+	   		end if;
+			if i_exx THEN
+				ex[3..0] = n_X[3..0];			% ex x %
+				ex[3..0].ena=VCC;
+		   	end if;
+			if (i_ldxn) THEN				% ld X,(n) %
+				n_X[7..0]=n_ramdata[7..0];
+				n_X[7..0].ena=VCC;
+			end if;
+			if (i_ina) THEN					% in PA %	--für Keyboard
+				n_X[7..0]=IO_inA[];
+				n_X[7..0].ena=VCC;
+				inA_stb= GND;
+			end if;
+			if (i_inb) THEN					% in PB %	--Port B
+				n_X[7..0]=IO_inB[] OR (B"000",acs[6] and count[15],B"0000");
+				n_X[7..0].ena=VCC;
+			end if;
+			if (i_inc) THEN					% in PC %	--für Tastaturmatrix
+				n_X[7..0]=IO_inC[];
+--				n_X[7..0]=H"FF" XOR tmatrix[];
+				n_X[7..0].ena=VCC;
+				inC_stb= GND;
+			end if;
+			if (i_refresh) THEN				% ld X,R %
+				n_X[6..0]=n_refresh[6..0];
+				n_X[7..0].ena=VCC;
+ 			end if;
+			if (i_exip) THEN				% ex x,ipl, ex x,iph %
+				if befehl[0] THEN
+					n_X[7..0]=n_ip[15..8];
+					n_ip[15..8].ena=VCC;
+					exip[15..8].ena=exh;
+					exh.ena=VCC;
+				else
+					n_X[7..0]=n_ip[7..0];
+					n_ip[7..0].ena=VCC;
+					exip[7..0].ena=exl;
+					exl.ena=VCC;
+				end if;
+				n_X[7..0].ena=VCC;
+				n_ip[7..0]=n_X[7..0];
+				n_ip[15..8]=n_X[7..0];
+			end if;
+			if (i_exzp) THEN				% ex zp %
+				exip[15..8].ena=exh;
+				exip[7..0].ena=exl;
+				exh.ena=VCC;
+				exl.ena=VCC;
+				n_X[7..0]=n_ip[7..0];
+				n_X[7..0].ena=VCC;
+				n_ip[7..0]=n_X[7..0];
+				n_ip[15..8]=GND;
+				n_ip[].ena=VCC;
+			end if;
+			if (i_ldip) THEN				% ld ip %
+				n_ip[]=exip[];
+				n_ip[].ena=VCC;
+			end if;
+			if (i_ipp OR i_addipx) THEN					% ip++, ip--, add ip,x %
+				n_ip[]=n_ipout[];
+				n_ip[].ena=VCC;
+			end if;
+			if (i_jxnz) AND ((n_X[7..0]!=H"00") XOR befehl[4]) THEN	% jrnz & jrz%
+				n_count[3..0] = befehl[3..0];
+				stat[1..0]=B"01";					--alten Befehl verwerfen
+			end if;	
+	end case;
+
+	if i_A32 AND(stat[1..0]==B"00") THEN
+ 		refresh=VCC;
+		(exh,exl)=VCC;
+		(exh,exl).ena=VCC;
+--		IF  inter AND n_mb[3..1]==0 AND NOT cpumode AND NOT acs[6] THEN  
+		IF  inter AND n_mb[3..1]==0 AND NOT cpumode THEN  
+			intac=iflag;								--H->int akzeptiert
+--			count[15..5] = (B"1111100",B"0000"); 	-- F800->Hsync 
+			count[15..5] = (B"1111100",iflag,B"000"); 	-- F800->Hsync F900->interrupt
+		ELSE 
+			count[12..5] = n_X[7..0];
+			count[15..13] = n_mb[2..0];
+		END IF;
+		count[4..0] = GND;
+--		n_mb[0]=cpumode;
+		n_mb[0]=(n_mb[2..0]==1);-- OR keybugfix;
+		n_mb[3..0].ena=VCC;
+		count[15..13].ena=VCC;				--Erweiterter MB-Sprung
+		stat[1..0] = B"01";					--alten Befehl verwerfen
+		n_X[].ena=vcc;						--X=0
+	else
+		(count[12..0])=lpm_add_sub (GND,count[12..0], n_count[12..0], VCC)
+		   WITH (LPM_WIDTH=13, LPM_REPRESENTATION="UNUSED", LPM_DIRECTION, ONE_INPUT_IS_CONSTANT, LPM_PIPELINE, MAXIMIZE_SPEED);
+	end if;
+ 
+	IF stat[1]  THEN  -- Speicher und IO-Zugriffe
+		prgadr[13..0]=n_ip[13..0];
+		IF  cpumode OR stat[3] OR stat[2] THEN 	--linearer Zugriff bei 6502 shadow Z80 und IO
+--		IF  cpumode OR stat[3] THEN 	--linearer Zugriff bei 6502 shadow Z80 und IO
+			prgadr[22..14] = (B"000",n_mb[7..4], n_ip[15..14]);
+		ELSE 
+--DKtronik + 6128 RAM
+			prgadr[15..14] = dktroniksel[1..0];
+			IF dktroniksel[2] THEN
+				prgadr[22..16] = (B"0011", dktronik[5..3]);
+			ELSE
+				prgadr[22..16] = (B"000",n_mb[7..4]);
+			END IF;
+		END IF;
+	else
+		prgadr[22..0]=(B"0001000",count[15..0]);
+	end if;
+
+END IF;
+
+prgdata[]=n_tri[].out;
+
+--Registerblock ansprechen
+
+--IF i_inc THEN
+tmatrixo[]=H"FF" XOR tmatrix[];
+--IF stat[1..0]==B"10" THEN  --bei IN x,(ip++)
+IF NOT riscena THEN  --bei Z80ena
+	IF io_inc[3..0]==B"1100" THEN	--9+3 Joystick A
+		tmatrix[]=(n_ramdata[7], GND, joy[5..0]);
+	ELSIF io_inc[3..0]==B"1001" THEN	--6+3 Joystick B
+		tmatrix[]=(GND, GND, joy[11..6]) OR n_ramdata[7..0];
+	ELSE	
+		tmatrix[]=n_ramdata[7..0];
+	END IF;		
+	regadr[7..0]=(io_inc[3..0]+3,B"0000");
+ELSE
+	regadr[3..0]=befehl[3..0];
+	if  befehl[4] AND (NOT befehl[7]) then
+		IF befehl[3..1] == b"110" THEN
+			regadr[7..4]=(GND,GND,ixymux,VCC);  -- IX & IY adressieren
+		ELSE
+			regadr[7..4]=(GND,GND,GND,VCC);
+		END IF;
+	else
+		if befehl[3] then
+			regadr[7..4]=H"0";
+		else
+			regadr[7..4]=ex[];
+		end if;
+	end if;
+END IF;
+
+--****************************
+--Interruptsteuerung
+--****************************
+
+(interrupt, int []).clk=HSYNC;
+
+int[5..0].clrn= NOT intres;
+int[5].clrn= NOT intac;
+
+IF NOT (prgadr[15] OR IO_WR) AND (n_X[7..6] == B"10") THEN
+	intres=n_X[4];			--MF bit4=H => int reset
+	intres.ena=VCC;
+END IF;
+intres.clrn=int[5] OR int[4] OR int[3] OR int[2] OR int[1] OR int[0];
+
+IF (int[]==51) THEN
+	interrupt = VCC;
+	int[]=0;
+ELSE
+	IF vsyncin THEN
+		interrupt = int[5];
+		int[]=0;
+	ELSE
+		int[]=int[]+1;
+	END IF;
+END IF;
+
+
+itrans=GND;
+itrans.clk=interrupt;
+iflag=itrans;
+itrans.prn=vint;
+(iflag, intac, vint, mbvint).clk=clk;
+n_int.clrn=NOT intac;
+inter=NOT (iflag AND (NOT n_int OR NOT intFF));
+
+intFF=NOT ((vint OR cpumode)AND NOT (intFF AND NOT intac AND NOT intres ));
+
+
+
+END;

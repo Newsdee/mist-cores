@@ -1,0 +1,301 @@
+-- Copyright (c) 2005-2006 Tobias Gubener
+-- Subdesign CPC T-REX by TobiFlex
+-- All rights reserved
+--
+-- Redistribution and use in source and synthezised forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+--
+-- Redistributions of source code must retain the above copyright notice,
+-- this list of conditions and the following disclaimer.
+--
+-- Redistributions in synthesized form must reproduce the above copyright
+-- notice, this list of conditions and the following disclaimer in the
+-- documentation and/or other materials provided with the distribution.
+--
+-- Neither the name of the author nor the names of other contributors may
+-- be used to endorse or promote products derived from this software without
+-- specific prior written permission.
+--
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+-- THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-- PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE
+-- LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+-- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+-- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+-- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+-- CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+-- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+-- POSSIBILITY OF SUCH DAMAGE.
+--
+
+INCLUDE "ioblock.inc";
+ 
+SUBDESIGN mycpc
+(
+	data[7..0]				: INPUT;
+	adr[15..0]				: INPUT;
+	iowr					: INPUT;
+--	iord					: INPUT;
+	intackin				: INPUT;
+	mem_wr					: INPUT;
+--	m1						: INPUT;
+--	mreq					: INPUT;
+--	iorq					: INPUT;
+--	rd						: INPUT;
+--	wr						: INPUT;
+--	refresh					: INPUT;
+--	halt					: INPUT;
+--	busak					: INPUT;
+	vena					: INPUT;
+	sysclk					: INPUT;
+--	clkena					: INPUT;
+	memdin[7..0]			: INPUT;
+	vsync					: OUTPUT;
+--	memadr[16..0]			: OUTPUT;
+	video[15..0]			: OUTPUT;
+	vgahsync				: OUTPUT;
+	vgavsync				: OUTPUT;
+	CPUCLK					: INPUT;
+	reset					: INPUT;
+	riscview				: INPUT;
+	ramcs					: OUTPUT;
+	1MHz					: OUTPUT;
+--	iord					: OUTPUT;
+	int						: OUTPUT;
+--	iowr					: OUTPUT;
+--	memrd					: OUTPUT;
+	sdaddr[22..0]			: OUTPUT;
+	vack					: OUTPUT;
+	disp					: OUTPUT;
+	vaddr[22..0]			: OUTPUT;
+	pixclk					: OUTPUT;
+)
+
+VARIABLE
+	count[3..0]				:DFF;
+	1MHZcount[6..0]			:DFF;
+--	cpuclkcount[4..0]	 	:DFF;
+	ioblocki				:ioblock;
+	LROMena, HROMena		:NODE;
+--	cpuhadr[16..14]			:NODE;
+--	25MHz, 25MHzd			:DFF;
+	16MHz					:TFF;
+	crtcnt[1..0]			:DFF;
+	interrupt				:DFFE;
+	intres					:DFF;
+	intcnt[5..0]			:DFF;
+	romsel[3..0]			:DFFE;
+	dktronik[5..0]			:DFFE;
+	dktroniksel[2..0]		:NODE;
+	isdaddr[22..0]			:NODE;
+	vsyncd[1..0]			:DFF;
+	intack					:DFF;
+	vdata[7..0]				:DFFE;
+	zeilen[8..0]			:DFF;
+	nosync					:DFFE;
+BEGIN
+DEFAULTS
+--	ioblocki.stb_vdata=GND;
+	interrupt.ena=GND;
+	ramcs=VCC;
+	romsel[].ena=GND;
+	dktronik[].ena=GND;
+	vdata[].ena=GND;
+	nosync.ena=GND;	
+END DEFAULTS;
+TABLE
+  (dktronik[2..0],adr[15..14])       	=>      dktroniksel[];
+ 		               	B"00000"        =>      B"000";
+ 		               	B"00001"        =>      B"001";
+ 		               	B"00010"        =>      B"010";
+ 		               	B"00011"        =>      B"011";
+
+ 		               	B"00100"        =>      B"000";
+ 		               	B"00101"        =>      B"001";
+ 		               	B"00110"        =>      B"010";
+ 		               	B"00111"        =>      B"111";
+
+ 		               	B"01000"        =>      B"100";
+ 		               	B"01001"        =>      B"101";
+ 		               	B"01010"        =>      B"110";
+ 		               	B"01011"        =>      B"111";
+
+ 		               	B"01100"        =>      B"000";
+ 		               	B"01101"        =>      B"011";
+ 		               	B"01110"        =>      B"010";
+ 		               	B"01111"        =>      B"111";
+
+ 		               	B"10000"        =>      B"000";
+ 		               	B"10001"        =>      B"100";
+ 		               	B"10010"        =>      B"010";
+ 		               	B"10011"        =>      B"011";
+
+		               	B"10100"        =>      B"000";
+ 		               	B"10101"        =>      B"101";
+ 		               	B"10110"        =>      B"010";
+ 		               	B"10111"        =>      B"011";
+
+ 		               	B"11000"        =>      B"000";
+ 		               	B"11001"        =>      B"110";
+ 		               	B"11010"        =>      B"010";
+ 		               	B"11011"        =>      B"011";
+
+		               	B"11100"        =>      B"000";
+ 		               	B"11101"        =>      B"111";
+ 		               	B"11110"        =>      B"010";
+ 		               	B"11111"        =>      B"011";
+END TABLE;
+	count[].clk=16MHz;
+	count[]=count[]-1;
+
+--	iowr=iorq OR wr;
+--	iord=iorq OR rd;
+--	memrd=mreq OR rd;
+	
+	ioblocki.cpuclk=CPUCLK;
+	ioblocki.16MHz=16MHz;
+	ioblocki.IO_Adr[]=adr[15..8];
+	ioblocki.io_data[]=data[];
+	ioblocki.iowr=iowr;
+	ioblocki.vdatain[]=memdin[];--vdata[];
+	ioblocki.reset=reset;
+	ioblocki.count[]=(count[3..0]);
+	ioblocki.riscview=riscview;
+	disp=ioblocki.disp;
+
+	video[]=ioblocki.video[];
+	vgahsync=ioblocki.hsync;
+	vgavsync=ioblocki.vsync;
+	vsync=ioblocki.divsync;
+	vack=ioblocki.vack;
+	
+	vdata[].clk=cpuclk;
+	vdata[]=memdin[];
+	vdata[].ena=vena;
+	
+	(crtcnt[], 16MHz).clk=sysclk;
+	IF crtcnt[]==3 THEN
+		crtcnt[]=1;
+		16MHz=VCC;	
+	ELSE
+		crtcnt[]=crtcnt[]+1;
+		16MHz=GND;
+	END IF;	
+	pixclk=NOT crtcnt[1];	
+	
+	1MHZcount[].clk=sysclk;
+	1MHz=NOT 1MHzcount[6];
+	IF 1MHZcount[]==0 THEN
+		1MHZcount[]=95;
+	ELSE
+		1MHZcount[]=1MHZcount[]-1;
+	END IF;
+---------------------------------
+--	IF mreq OR vena THEN
+--		sdaddr[]=(b"1011", ioblocki.vadr[15..0]);
+		vaddr[]=ioblocki.vadr[];
+--		ioblocki.stb_vdata=VCC;
+--	ELSE
+	
+--	IF mreq THEN
+--		memadr[]=(GND, adr[15..0]);
+--	ELSE
+--		memadr[13..0]=adr[13..0];
+		sdaddr[13..0]=adr[13..0];
+		IF HROMena THEN
+--				ramcs=rd;
+--				memadr[16..14]=romsel[2..0]; 
+				sdaddr[22..14]=(B"00011",romsel[]); 
+--				sdaddr[19..14]=(B"110001"); 
+		ELSE
+			IF LROMena THEN
+--				ramcs=rd;
+--				memadr[16..14]=(B"100");
+				sdaddr[22..14]=B"000100100"; 
+			ELSE
+--				memadr[16..14]=(GND, adr[15..14]);
+				sdaddr[]=isdaddr[];
+--				sdaddr[19..14]=(B"1011", adr[15..14]);
+			END IF;
+		END IF;
+--	END IF;
+--	END IF;
+	HROMena = mem_wr AND adr[14] AND  adr[15]  AND NOT ioblocki.ROMena[1]; 			--H aktiv
+	LROMena = mem_wr AND NOT adr[14] AND NOT adr[15] AND NOT ioblocki.ROMena[0];	--H aktiv
+
+--DKtronik + 6128 RAM
+	isdaddr[15..0] = (dktroniksel[1..0], adr[13..0]);
+	IF dktroniksel[2] THEN
+		isdaddr[22..16] = (B"0010", dktronik[5..3]);
+	ELSE
+		isdaddr[22..16] = B"0001011";
+	END IF;
+--****************************
+--DKtronik RAM
+--****************************
+	dktronik[].clk=cpuclk;
+	dktronik[]=data[5..0];	--512
+--	dktronik[]=(B"00",data[3..0]);	--128
+	dktronik[].clrn = reset;
+	IF NOT iowr AND NOT adr[15] AND data[7] AND data[6] THEN	--MF2-Reg
+		dktronik[].ena=VCC;
+	END IF;
+--****************************
+--ROMSELECT
+--****************************
+	
+	romsel[].clk=cpuclk;
+--	IF data[]>0 AND data[]<8 THEN
+	IF data[]<16 THEN
+		romsel[3..0]=data[3..0];  
+	ELSE		
+		romsel[3..0]=B"0000";  
+	END IF;	
+	IF NOT iowr AND NOT adr[13] THEN			--IOWR ROM selektieren
+		romsel[].ena=VCC;
+	END IF;				
+
+--****************************
+--Interruptsteuerung
+--****************************
+(intres, intack).clk=CPUCLK;
+IF NOT (adr[15] OR iowr) AND (data[7..6] == B"10") THEN
+	intres=data[4];			--MF bit4=H => int reset
+ELSE
+	intres=GND;
+END IF;
+intack=NOT intackin;
+intcnt[4..0].clrn= NOT intres;
+intcnt[5].clrn= intack AND NOT intres;
+
+vsyncd[]=(vsyncd[0], vsync);
+(interrupt, intcnt[], vsyncd[], zeilen[], nosync).clk=not ioblocki.HSYNC;
+
+interrupt.clrn=intack;
+--interrupt = intcnt[5] OR interrupt;
+interrupt = intcnt[5] OR nosync;
+int=NOT interrupt;
+
+IF NOT vsyncd[1] AND  vsyncd[0] THEN
+	zeilen[]=0;
+	IF zeilen[]<=312 THEN
+		nosync=GND;
+		nosync.ena=VCC;
+	END IF;	
+ELSE
+	zeilen[]=zeilen[]+1;
+	IF zeilen[]>312 THEN
+		nosync=VCC;
+		nosync.ena=VCC;
+	END IF;	
+END IF;		
+
+IF (intcnt[]==51) OR (NOT vsyncd[1] AND  vsyncd[0])THEN
+	interrupt.ena=VCC;
+	intcnt[]=0;
+ELSE
+	intcnt[]=intcnt[]+1;
+END IF;
+
+END;

@@ -1,0 +1,1772 @@
+-- Copyright (c) 2006 Tobias Gubener
+-- Subdesign CPC T-REX by TobiFlex
+-- All rights reserved
+--
+-- Redistribution and use in source and synthezised forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+--
+-- Redistributions of source code must retain the above copyright notice,
+-- this list of conditions and the following disclaimer.
+--
+-- Redistributions in synthesized form must reproduce the above copyright
+-- notice, this list of conditions and the following disclaimer in the
+-- documentation and/or other materials provided with the distribution.
+--
+-- Neither the name of the author nor the names of other contributors may
+-- be used to endorse or promote products derived from this software without
+-- specific prior written permission.
+--
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+-- THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-- PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE
+-- LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+-- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+-- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+-- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+-- CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+-- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+-- POSSIBILITY OF SUCH DAMAGE.
+--
+ 
+INCLUDE "regfile.inc";
+  
+FUNCTION lpm_add_sub (cin, dataa[LPM_WIDTH-1..0], datab[LPM_WIDTH-1..0], add_sub)
+   RETURNS (result[LPM_WIDTH-1..0]);
+       
+SUBDESIGN rz80
+(
+	ramdata[7..0]									:INPUT;
+	IOdatain[7..0]									:INPUT;
+	clk												:INPUT;
+	reset											:INPUT=VCC;
+	interrupt										:INPUT;
+	dataout[7..0]									:OUTPUT;
+	memaddr[15..0]									:OUTPUT;
+	IO_WR											:OUTPUT;
+	IO_RD											:OUTPUT;
+	intack											:OUTPUT;
+	mem_wr, mem_oe									:OUTPUT;
+	refresh											:OUTPUT;
+	faster											:OUTPUT;
+	iorq											:OUTPUT;
+	slower											:OUTPUT;
+)
+
+VARIABLE
+	ramdatain[7..0]				:NODE;
+	
+	Z80PC[15..0], stat[1..0], befehl[7..0]			:DFFE;
+	nxbefehl[7..0]									:DFFE;
+	n_X[7..0], n_Y[7..0]							:DFFE;
+	n_refresh[7..0]									:DFFE;
+	OP1out[15..0], OP2out[15..0]					:NODE;
+	regin[15..0]									:NODE;
+	d_memaddr[15..0]								:DFFE;
+	n_regwr											:NODE;
+	n_count[15..0]									:NODE;
+	n_oe											:NODE;
+	n_ipo[15..0], n_ipout[16..0]					:NODE;
+	regsource[5..0], regdest[5..0], wraddr[5..0]	:NODE;
+	destaddr[7..0]									:NODE;
+	inA_stb											:DFF;
+	inC_stb											:DFF;
+	n_ergebnis[8..0]								:NODE;
+	add_in[19..0]									:NODE;
+	ixymux											:DFFE;
+	regdata					:regfile;
+	prefix[3..0]									:DFFE;
+	memstat[1..0]									:NODE;
+	microaddr[7..0]									:DFFE;
+	micronext[7..0]									:NODE;
+	next											:NODE;
+	n_zflagl, n_zflagh								:NODE;
+	rddir, wrdir, memdir, direkt[7..0]				:NODE;
+	prestore										:NODE;
+	PCdirekt										:NODE;
+	exx, exaf										:DFFE;
+	n_adda[15..0], adde								:NODE;
+	ixye											:NODE;
+	calc_ixy										:DFFE;
+	Z80Flags[7..0], Z80Flagsb[7..0]					:DFFE;
+	con1,con2										:NODE;
+	reginipout										:NODE;
+	nop												:NODE;
+	addop2											:NODE;
+	login[7..0], logout[7..0]						:NODE;
+	inout											:NODE;
+	exde, exdeb										:DFFE;
+	rotout[7..0], rotcout							:NODE;
+	bitmask[7..0], regrot[5..0]						:NODE;
+	wasidx, cb_tab, nxdir 							:NODE;
+	lastz											:DFF;
+	IFF[1..0], intexe								:DFFE;
+	noint, nohalt, halt, nullop1					:NODE;
+	flags16, addFlags, logFlags, SaveCFlag, daa		:NODE; 
+	WRout[7..0]										:DFFE;
+	PFlagdir, clearXY								:NODE;
+	faster, clone									:NODE;
+	setrefresh										:NODE;
+BEGIN
+DEFAULTS
+	stat[]=GND;
+	stat[].ena=VCC;
+	n_X[]=GND;
+	n_X[].ena=GND;
+	n_Y[]=GND;
+	n_Y[].ena=GND;
+	n_refresh[].ena=GND;
+	n_oe=GND;
+	mem_wr=VCC;
+	mem_oe=GND;
+	IO_WR=VCC;
+	IO_RD=VCC;
+	n_regwr=GND;
+	n_count[] = 1;
+	inA_stb=VCC;
+	inC_stb=VCC;
+	ixymux.ena=GND;
+	refresh=GND;
+	nxbefehl[].ena=GND;
+	befehl[].ena=GND;
+	regin[]=GND;
+	prefix[]=GND;
+	prefix[].ena=GND;
+	memstat[]=GND;
+	microaddr[].ena=GND;
+	micronext[]=1;
+	next=GND;
+	wrdir=GND;
+	rddir=GND;
+	memdir=GND;
+	prestore=GND;
+	PCdirekt=GND;
+	regdata.wren=GND;
+	add_in[19..2]=GND;
+	add_in[1..0]=VCC;	--add 01
+	n_ipo[15..8]=B"00000000";
+	(exx, exaf).ena=GND;
+	adde=GND;
+	ixye=GND;
+	calc_ixy=GND;
+	calc_ixy.ena=GND;
+	Z80Flags[]=GND;
+	Z80Flags[].ena=GND;
+	Z80Flagsb[].ena=GND;
+	reginipout=GND;
+	nop=GND;
+	addop2=GND;
+	(exde, exdeb).ena=GND;
+	inout=GND;
+	cb_tab=GND;
+	nxdir=GND;
+	wasidx=GND;
+	IFF[]=GND;
+	IFF[].ena=GND;
+	noint=GND;
+	nohalt=GND;
+	halt=GND;
+	intexe=GND;
+	intexe.ena=GND;
+	intack=GND;
+	n_adda[]=GND;
+	nullop1=GND;
+	(flags16, addFlags, logFlags, SaveCFlag, daa)=GND;
+	WRout[].ena=VCC;
+	PFlagdir=GND;
+	clearXY=GND;
+	clone=GND;
+	faster=GND;
+	slower=GND;
+	setrefresh=GND;
+END DEFAULTS;
+
+iorq=NOT inout;
+
+ramdatain[]=ramdata[];
+
+	nxbefehl[]=ramdatain[];
+		
+	Z80PC[].clrn = reset;
+	stat[].clrn = reset;
+	befehl[].clrn = reset;
+
+
+IF wraddr[5] THEN
+	regdata.data[]=regin[];
+	OP1out[] = regdata.qa[];
+ELSE
+	IF wraddr[0] THEN
+		OP1out[7..0] = regdata.qa[7..0];
+		regdata.data[]=(regdata.qa[15..8], regin[7..0]);
+	ELSE
+		OP1out[7..0] = regdata.qa[15..8];
+		regdata.data[]=(regin[7..0], regdata.qa[7..0]);
+	END IF;
+END IF;
+
+destaddr[7..4]=B"0000";
+IF wraddr[4] THEN
+	destaddr[3..2]=wraddr[4..3];
+	destaddr[1..0]=wraddr[2..1];
+ELSE
+	IF wraddr[2..1]==B"11" THEN
+		destaddr[1..0]=wraddr[2..1];
+		IF wraddr[3] THEN
+			destaddr[3..2]=B"01";
+		ELSE
+			destaddr[3..2]=(exaf,B"0");
+		END IF;
+	ELSE
+		IF prefix[3] AND(wraddr[2..1]==B"10") AND NOT calc_ixy THEN
+			destaddr[1..0]=wraddr[2..1];
+			destaddr[3..2]=(B"1",prefix[2]);
+		ELSE
+			destaddr[1..0]=wraddr[2..1] XOR ((wraddr[1] XOR wraddr[2]) AND exde);
+			destaddr[3..2]=(B"0",exx);
+		END IF;	
+	END IF;
+END IF;
+regdata.wraddress[]=destaddr[];
+regdata.rdaddress_a[]=destaddr[];
+
+IF regsource[5] THEN
+	OP2out[] = regdata.qb[];
+ELSE
+	IF regsource[0] THEN
+		OP2out[7..0] = regdata.qb[7..0];
+	ELSE
+		OP2out[7..0] = regdata.qb[15..8];
+	END IF;
+END IF;
+IF addop2 THEN
+	(n_ipo[15..8], add_in[8..1])=OP2out[];
+	login[]=OP2out[7..0];
+END IF;
+WRout[]=OP2out[7..0];
+
+regdata.rdaddress_b[7..4]=B"0000";
+IF regsource[4] THEN
+	regdata.rdaddress_b[3..2]=regsource[4..3];
+	regdata.rdaddress_b[1..0]=regsource[2..1];
+ELSE
+	IF regsource[2..1]==B"11" THEN
+		regdata.rdaddress_b[1..0]=regsource[2..1];
+		IF regsource[3] THEN
+			regdata.rdaddress_b[3..2]=B"01";
+		ELSE
+			regdata.rdaddress_b[3..2]=(exaf,B"0");
+		END IF;
+	ELSE
+		IF prefix[3] AND(regsource[2..1]==B"10") AND NOT calc_ixy AND NOT ixye THEN
+			regdata.rdaddress_b[1..0]=regsource[2..1];
+			regdata.rdaddress_b[3..2]=(B"1",prefix[2]);
+		ELSE
+			regdata.rdaddress_b[1..0]=regsource[2..1] XOR ((regsource[1] XOR regsource[2]) AND exde);
+			regdata.rdaddress_b[3..2]=(B"0",exx);
+		END IF;	
+	END IF;
+END IF;
+
+
+
+IF NOT memdir THEN
+	IF prestore THEN
+		d_memaddr[]=n_ipout[15..0];
+	ELSE	
+		d_memaddr[]=regdata.qa[];
+	END IF;
+END IF;
+
+regdata.rdclock=NOT clk;
+regdata.wrclock=clk;
+( Z80PC[], stat[], befehl[], nxbefehl[], inA_stb, inC_stb, WRout[]).clk=clk;
+(n_X[], n_Y[], ixymux, prefix[], microaddr[], IFF[], intexe).clk=clk;
+(n_refresh[], d_memaddr[], exx, exaf, calc_ixy, Z80Flags[], Z80Flagsb[], exde, exdeb, lastz).clk=clk;
+
+IF NOT setrefresh THEN
+	n_refresh[6..0]=n_refresh[6..0]+1;
+END IF;	
+
+
+IF (stat[]!=B"01") AND (NOT (ixye AND prefix[3]) OR calc_ixy) THEN  --was habe ich hier gemacht???
+	regdata.wren=n_regwr;
+	microaddr[].ena=VCC;
+	IF next THEN
+		microaddr[]=microaddr[]+micronext[];
+		prefix[1..0]=B"11";
+		prefix[1..0].ena=VCC;
+	ELSE	
+		prefix[].ena=NOT wasidx;
+		microaddr[]=0;
+	END IF;
+END IF;
+
+IF NOT nullop1 THEN
+	IF adde THEN
+		n_adda[]=d_memaddr[];
+	ELSE	
+		n_adda[]=OP1out[];
+	END IF;	
+END IF;
+
+IF reginipout THEN
+	regin[]=n_ipout[15..0];
+END IF;	
+
+---------------------------------------------------------------------
+--Flags
+---------------------------------------------------------------------
+IF NOT PFlagdir THEN
+	IF logFlags OR daa THEN
+		Z80Flags[2]=NOT (((regin[0] xor regin[1]) xor (regin[2] xor regin[3])) xor ((regin[4] xor regin[5]) xor (regin[6] xor regin[7])));
+	ELSE
+		IF addFlags THEN
+			IF flags16 THEN
+				Z80Flags[2]=n_ipout[16] XOR n_ipout[15] XOR n_adda[15] XOR n_ipo[15];	--V
+			ELSE	
+				Z80Flags[2]=n_ergebnis[8] XOR n_ergebnis[7] XOR add_in[8] XOR add_in[17];	--V
+			END IF;
+		END IF;		
+	END IF;
+END IF;
+
+IF flags16 THEN
+	Z80Flags[7]=regin[15];	--S
+	Z80Flags[6]=n_zflagl AND n_zflagh;	--Z
+	Z80Flags[0]=n_ipout[16];		--C
+	Z80Flags[5]=regin[13];	--Y
+	Z80Flags[3]=regin[11];	--X
+	Z80Flags[4]=n_ipout[12] XOR n_adda[12] XOR n_ipo[12];	--H
+ELSE
+	IF addFlags OR logFlags THEN	
+		Z80Flags[7]=regin[7];	--S
+		Z80Flags[6]=n_zflagl;	--Z
+		Z80Flags[5]=regin[5] AND NOT clearXY;	--Y
+		Z80Flags[3]=regin[3] AND NOT clearXY;	--X
+	END IF;	
+	IF addFlags THEN
+		Z80Flags[0]=n_ergebnis[8] OR (daa AND Z80Flags[0]);
+		Z80Flags[4]=n_ergebnis[4] XOR add_in[5] XOR add_in[14];	--H
+	END IF;
+END IF;	
+IF addFlags THEN
+	Z80Flags[1]=NOT add_in[0];	--N
+END IF;
+	
+IF addFlags OR logFlags THEN
+	Z80Flags[7].ena=VCC;	--S
+	Z80Flags[6].ena=VCC;	--Z
+	Z80Flags[5].ena=VCC;	--Y
+	Z80Flags[4].ena=NOT daa OR add_in[2];	--H
+	Z80Flags[3].ena=VCC;	--X
+	Z80Flags[2].ena=VCC;	--V
+	Z80Flags[1].ena=VCC;	--N
+	Z80Flags[0].ena=NOT saveCFlag;	--C
+END IF;
+
+n_zflagl=regin[7..0]==H"00";
+n_zflagh=regin[15..8]==H"00";
+lastz=n_zflagl AND n_zflagh;
+
+n_ipout[7..0]=n_ergebnis[7..0];
+n_ipout[16..8]=lpm_add_sub ((n_ergebnis[8]XOR NOT add_in[0]), B"0",n_adda[15..8], B"0", n_ipo[15..8], add_in[0])
+		   WITH (LPM_WIDTH=9, LPM_REPRESENTATION="UNUSED", LPM_DIRECTION, ONE_INPUT_IS_CONSTANT="YES", LPM_PIPELINE, MAXIMIZE_SPEED);
+
+add_in[17..10]=n_adda[7..0]; 
+n_ergebnis[8..0]=lpm_add_sub (add_in[])
+				   WITH (LPM_WIDTH=9, LPM_REPRESENTATION="UNSIGNED", LPM_DIRECTION, ONE_INPUT_IS_CONSTANT, LPM_PIPELINE, MAXIMIZE_SPEED);
+
+	n_Y[]=nxbefehl[];
+	d_memaddr[].ena=memdir OR prestore OR wraddr[5];
+	IF (prefix[1..0]==B"11") OR (stat[]==B"00") THEN
+		stat[]=memstat[];
+	END IF;	
+	IF stat[1] OR nop THEN
+		befehl[]=nxbefehl[];
+	ELSE
+		befehl[]=ramdatain[];
+	END IF;	
+	
+	IF NOT stat[1] OR (prefix[1..0]==B"11") THEN
+		wraddr[]=regdest[];
+	ELSE
+		wraddr[]=regsource[];
+	END IF;	
+	IF stat[1] THEN
+		clone=VCC;
+		calc_ixy.ena=NOT next;
+		IF (ixye AND prefix[3]) AND NOT calc_ixy THEN
+			slower=VCC;
+			WRout[].ena=GND;
+			calc_ixy=VCC;
+			calc_ixy.ena=VCC;
+			memaddr[]=(Z80PC[]);
+			Z80PC[].ena=VCC;
+			stat[].ena=GND;
+			adde=VCC;
+			prestore=VCC;
+			nxbefehl[].ena=VCC;
+			n_ipo[15..8]=nxbefehl[7];
+			add_in[8..1]=nxbefehl[];
+		ELSE
+			memaddr[]=d_memaddr[];
+			befehl[].ena=NOT next;
+			IF stat[0] THEN				--LD (HL),EReg
+				n_oe=VCC;
+				mem_wr=inout;
+				IO_WR=NOT inout;
+				IF wrdir THEN
+					dataout[]=direkt[];
+				ELSE
+					dataout[]=WRout[];
+				END IF;
+			ELSE						--LD EReg,(HL)
+				IO_RD=NOT inout;
+				IF NOT rddir THEN
+					IF inout THEN
+						regin[7..0]=IOdatain[];		--IO
+					ELSE	
+						regin[7..0]=ramdatain[];		
+					END IF;	
+					regdata.wren=VCC;
+				END IF;	
+			END IF;
+		END IF;
+		n_refresh[6..0].ena=VCC;
+	ELSE
+		memaddr[]=(Z80PC[]);
+		Z80PC[].ena=NOT nop AND NOT halt;
+		IF stat[0] THEN				--NOP
+			clone=VCC;
+			befehl[].ena=VCC;
+			calc_ixy.ena=VCC;
+		ELSE						--exe
+			IF (stat[]==B"00") AND (prefix[]==B"0000") THEN
+				IF intexe THEN
+					IFF[].ena=VCC;
+					intack=VCC;
+					n_count[]=-1;
+					nohalt=VCC;
+				END IF;
+			END IF;
+			calc_ixy.ena=NOT memstat[1] AND NOT next;
+			befehl[].ena=NOT memstat[1] AND NOT next;
+			clone=NOT memstat[1] AND NOT next;
+			IF NOT nop THEN
+				nxbefehl[].ena=NOT nxdir;--VCC;
+				n_Y[].ena=VCC;
+			END IF;
+		END IF;
+	END IF;
+	IF IFF[1] AND NOT interrupt THEN
+		intexe=NOT noint;
+	END IF;	
+	intexe.ena=VCC;
+
+	IF NOT PCdirekt THEN
+		(Z80PC[])=lpm_add_sub (GND,Z80PC[], n_count[], VCC)
+		   WITH (LPM_WIDTH=16, LPM_REPRESENTATION="UNUSED", LPM_DIRECTION, ONE_INPUT_IS_CONSTANT, LPM_PIPELINE, MAXIMIZE_SPEED);
+	END IF;
+
+----------------------------------------------------------------------
+-- JUMPTABLE
+----------------------------------------------------------------------			
+
+	IF intack THEN
+		micronext[]=80;
+		next=VCC;
+		--halt
+		IF befehl[]== B"01110110" THEN	 
+			halt=VCC;
+		END IF;
+	ELSE
+		IF stat[]!=B"01" THEN
+		CASE (prefix[1..0],befehl[]) IS
+
+			--ex af
+			WHEN B"0000001000" => 
+				exaf= NOT exaf;
+				exaf.ena=VCC;
+				Z80Flags[]=Z80Flagsb[];
+				Z80Flagsb[]=Z80Flags[];
+				Z80Flags[].ena=VCC;
+				Z80Flagsb[].ena=VCC;
+				
+			--djnz e
+			WHEN B"0000010000"  
+				=>	regdest[]   =B"000000";--B
+					add_in[1..0]=GND;		--sub
+					n_regwr=VCC;
+					reginipout=VCC;
+					slower=VCC;
+					IF OP1out[7..0]==B"00000001" THEN
+--					IF n_zflagl THEN
+						memstat[]=B"01";
+					ELSE	
+						micronext[]=1;
+						next=VCC;
+					END IF;	
+
+			--JR e
+			WHEN B"0000011000"  
+				=>	micronext[]=1;
+					next=VCC;
+
+			--JR cc,e
+			WHEN B"0000100000",B"0000101000",B"0000110000",B"0000111000"  
+				=>	IF con1 THEN
+						micronext[]=1;
+						next=VCC;
+					ELSE	
+						memstat[]=B"01";
+					END IF;	
+
+			--ld DReg,nn
+			WHEN B"0000000001",B"0000010001",B"0000100001",B"0000110001"  
+				=>	micronext[]=2;
+					next=VCC;
+			
+			--LD (BC|DE),A
+			WHEN B"0000000010",B"0000010010"
+				=>	memstat[]=B"11";	--LD (HL),EReg
+					regdest[]   =(B"1000",befehl[4],B"0");
+					regsource[] =B"000111";	--A
+					
+			--LD DReg,(nn),DReg
+			WHEN B"0000100010",B"0000101010",
+				 B"1001000011",B"1001010011",B"1001100011",B"1001110011",
+				 B"1001001011",B"1001011011",B"1001101011",B"1001111011"
+				=>	micronext[]=14;
+					next=VCC;
+
+			--LD A,(nn),A
+			WHEN B"0000110010",B"0000111010"
+				=>	micronext[]=12;
+					next=VCC;
+
+			--LD A,(BC|DE)		
+			WHEN B"0000001010",B"0000011010"
+				=>	memstat[]=B"10";	--LD EReg,(HL)
+					regdest[] =(B"1000",befehl[4],B"0");
+					regsource[]   =B"000111";	--A
+			
+			--INC DReg, DEC DReg
+			WHEN B"0000001011",B"0000011011",B"0000101011",B"0000111011",
+				 B"0000000011",B"0000010011",B"0000100011",B"0000110011"  
+				 =>	regdest[]=(B"101",befehl[5..4],B"0");
+					n_regwr=VCC;
+					slower=VCC;
+					reginipout=VCC;
+					add_in[1..0]=NOT befehl[3];		--add 01/sub 01
+					
+			--INC EReg, DEC EReg
+			WHEN B"0000001100",B"0000011100",B"0000101100",B"0000111100",
+				 B"0000000100",B"0000010100",B"0000100100",
+				 B"0000001101",B"0000011101",B"0000101101",B"0000111101",
+				 B"0000000101",B"0000010101",B"0000100101"  
+				 =>	regdest[]   =(B"000",befehl[5..3]);
+					n_regwr=VCC;
+					reginipout=VCC;
+					add_in[0]=NOT befehl[0];		--add 01/sub 01
+					add_in[19]=befehl[0];		--add 01/sub 01
+					addFlags=VCC;
+					saveCFlag=VCC;
+					
+			--INC (HL), DEC (HL)
+			WHEN B"0000110100",B"0000110101"
+				=>	memstat[]=B"10";	--LD EReg,(HL)
+					regdest[] =(B"100100");
+					faster=VCC;
+					micronext[]=17;
+					next=VCC;
+			
+			--ADD HL,DReg
+			WHEN B"0000001001",B"0000011001",B"0000101001",B"0000111001"
+				 =>	regsource[]=(B"101",befehl[5..4],B"0");
+					regdest[] =(B"100100");	--HL
+					slower=VCC;
+					memstat[]=B"01";
+					nop=VCC;
+					flags16=VCC;
+					Z80Flags[5].ena=VCC;	--Y
+					Z80Flags[4].ena=VCC;	--H
+					Z80Flags[3].ena=VCC;	--X
+					Z80Flags[1].ena=VCC;	--N
+					Z80Flags[0].ena=VCC;	--C
+					n_regwr=VCC;
+					reginipout=VCC;
+					addop2=VCC;
+					
+			--LD EReg,n		
+			WHEN B"0000000110",B"0000001110",B"0000010110",B"0000011110",
+				 B"0000100110",B"0000101110",              B"0000111110"
+				=>	regdest[]   =(B"000",befehl[5..3]);
+--nur tmp				
+--					faster=VCC;
+					n_regwr=VCC;
+					regin[7..0]=ramdatain[];
+					memstat[]=B"01";
+
+			--RRCA/RLCA/RRA/RLA
+			WHEN B"0000000111",B"0000001111",B"0000010111",B"0000011111"
+				=>	regdest[] =B"000111";	--A
+					regin[7..0]=rotout[];
+					n_regwr=VCC;
+					Z80Flags[0]=rotcout;
+					Z80Flags[5].ena=VCC;	--Y
+					Z80Flags[5]=rotout[5];
+					Z80Flags[4].ena=VCC;	--H
+					Z80Flags[3].ena=VCC;	--X
+					Z80Flags[3]=rotout[3];
+					Z80Flags[1].ena=VCC;	--N
+					Z80Flags[0].ena=VCC;	--C
+			
+			--DAA    
+			WHEN B"0000100111"
+				=>	regdest[] =B"000111";	--A
+					--regin[7..0]=n_ipout[7..0];
+					reginipout=VCC;
+					n_regwr=VCC;
+					daa=VCC;
+						addFlags=VCC;
+					add_in[1]=GND;
+					add_in[0]=NOT Z80Flags[1];	--N
+					add_in[19]=Z80Flags[1];		--N
+					IF Z80Flags[4] OR (OP1out[3] AND (OP1out[2] OR OP1out[1])) THEN
+						add_in[3..2]=B"11";
+					END IF;
+--					IF Z80Flags[0] OR (OP1out[7] AND (OP1out[6] OR OP1out[5] OR (OP1out[4] AND add_in[2] AND NOT Z80Flags[1]))) THEN
+					IF Z80Flags[0] OR (OP1out[7] AND (OP1out[6] OR OP1out[5] OR (OP1out[4] AND NOT Z80Flags[4] AND (OP1out[3] AND (OP1out[2] OR OP1out[1])) AND NOT Z80Flags[1]))) THEN
+--				IF Z80Flags[1] THEN --sub
+--					IF Z80Flags[0] OR (OP1out[7] AND (OP1out[6] OR OP1out[5] OR (OP1out[4] AND (OP1out[3] AND (OP1out[2] OR OP1out[1]))))) THEN
+						add_in[7..6]=B"11";
+--						addFlags=VCC;
+					END IF;
+--				ELSE				--add	
+--					IF Z80Flags[0] OR (OP1out[7] AND (OP1out[6] OR OP1out[5] OR (OP1out[4] AND (OP1out[3] AND (OP1out[2] OR OP1out[1]))))) THEN
+--						add_in[7..6]=B"11";
+--					END IF;
+--				END IF;	
+		
+			--CPL
+			WHEN B"0000101111"
+				=>	regdest[] =B"000111";	--A
+					Z80Flags[4].ena=VCC;	--H
+					Z80Flags[1].ena=VCC;	--N
+					Z80Flags[4]=VCC;	--H
+					Z80Flags[1]=VCC;	--N
+					regin[7..0]=NOT OP1out[7..0];
+					n_regwr=VCC;
+	
+			--SCF
+			WHEN B"0000110111"
+				=>	Z80Flags[4].ena=VCC;	--H
+					Z80Flags[1].ena=VCC;	--N
+					Z80Flags[0].ena=VCC;	--C
+					Z80Flags[0]=VCC;
+		
+			--CCF
+			WHEN B"0000111111"
+				=>	Z80Flags[4].ena=VCC;	--H
+					Z80Flags[1].ena=VCC;	--N
+					Z80Flags[0].ena=VCC;	--C
+					Z80Flags[0]=NOT Z80Flags[0];
+					Z80Flags[4]=Z80Flags[0];
+		
+					
+			--LD (HL),n		
+			WHEN B"0000110110"
+				=>	memstat[]=B"11";	--LD (HL),n
+					regdest[]   =(B"100100");
+					micronext[]=0;
+					next=VCC;
+
+			--LD EReg,EReg
+			WHEN B"0001000000",B"0001000001",B"0001000010",B"0001000011",
+				 B"0001000100",B"0001000101",              B"0001000111",
+				 B"0001001000",B"0001001001",B"0001001010",B"0001001011",
+				 B"0001001100",B"0001001101",              B"0001001111",
+				 B"0001010000",B"0001010001",B"0001010010",B"0001010011",
+				 B"0001010100",B"0001010101",              B"0001010111",
+				 B"0001011000",B"0001011001",B"0001011010",B"0001011011",
+				 B"0001011100",B"0001011101",              B"0001011111",
+				 B"0001100000",B"0001100001",B"0001100010",B"0001100011",
+				 B"0001100100",B"0001100101",              B"0001100111",
+				 B"0001101000",B"0001101001",B"0001101010",B"0001101011",
+				 B"0001101100",B"0001101101",              B"0001101111",
+				 B"0001111000",B"0001111001",B"0001111010",B"0001111011",
+				 B"0001111100",B"0001111101",              B"0001111111"
+				=>	regsource[] =(B"000",befehl[2..0]);
+					regdest[]   =(B"000",befehl[5..3]);
+					n_regwr=VCC;
+					regin[7..0]=OP2out[7..0];
+
+			--LD EReg,(HL)		
+			WHEN B"0001000110",B"0001001110",B"0001010110",B"0001011110",
+				 B"0001100110",B"0001101110",              B"0001111110"
+				=>	memstat[]=B"10";	--LD EReg,(HL)
+					regdest[] =(B"100100");
+					regsource[]=(B"000",befehl[5..3]);
+					ixye=VCC;
+			
+			--LD (HL),EReg
+			WHEN B"0001110000",B"0001110001",B"0001110010",B"0001110011",
+				 B"0001110100",B"0001110101",              B"0001110111"
+				=>	regsource[] =(B"000",befehl[2..0]);
+					memstat[]=B"11";	--LD (HL),EReg
+					regdest[]   =(B"100100");
+					ixye=VCC;
+			--halt
+			WHEN B"0001110110"	
+				=>	memstat[]=B"01";
+					n_count[]=-1;
+					faster=VCC;
+
+			--ADD/ADC/SUB/SBC A,EReg
+			WHEN B"0010000000",B"0010000001",B"0010000010",B"0010000011",
+				 B"0010000100",B"0010000101",              B"0010000111",
+				 B"0010001000",B"0010001001",B"0010001010",B"0010001011",
+				 B"0010001100",B"0010001101",              B"0010001111",
+				 B"0010010000",B"0010010001",B"0010010010",B"0010010011",
+				 B"0010010100",B"0010010101",              B"0010010111",
+				 B"0010011000",B"0010011001",B"0010011010",B"0010011011",
+				 B"0010011100",B"0010011101",              B"0010011111"
+				 =>	regsource[] =(B"000",befehl[2..0]);
+					regdest[] =(B"000111");	--A
+					addFlags=VCC;
+					n_regwr=VCC;
+					add_in[0]=NOT befehl[4];
+					add_in[19]=(Z80Flags[0]AND befehl[3]) XOR befehl[4];
+					reginipout=VCC;
+					addop2=VCC;
+				
+			--ADD/ADC/SUB/SBC A,(HL)
+			WHEN B"0010000110",B"0010001110",B"0010010110",B"0010011110"
+				=>	memstat[]=B"10";	--LD EReg,(HL)
+					regdest[] =(B"100100");
+					faster=VCC;
+					micronext[]=20;
+					next=VCC;
+			
+			--AND/XOR/OR A,EReg
+			WHEN B"0010100000",B"0010100001",B"0010100010",B"0010100011",
+				 B"0010100100",B"0010100101",              B"0010100111",
+				 B"0010101000",B"0010101001",B"0010101010",B"0010101011",
+				 B"0010101100",B"0010101101",              B"0010101111",
+				 B"0010110000",B"0010110001",B"0010110010",B"0010110011",
+				 B"0010110100",B"0010110101",              B"0010110111"
+				 =>	regsource[] =(B"000",befehl[2..0]);
+					regdest[] =(B"000111");	--A
+					logFlags=VCC;
+					Z80Flags[4]=(befehl[4..3]==B"00");
+					regin[7..0]=logout[];
+					n_regwr=VCC;
+					addop2=VCC;
+				
+			--AND/XOR/OR A,(HL)
+			WHEN B"0010100110",B"0010101110",B"0010110110"
+				=>	memstat[]=B"10";	--LD EReg,(HL)
+					regdest[] =(B"100100");
+					faster=VCC;
+					micronext[]=26;
+					next=VCC;
+					
+			--CMP A,EReg
+			WHEN B"0010111000",B"0010111001",B"0010111010",B"0010111011",
+				 B"0010111100",B"0010111101",              B"0010111111"
+				 =>	regsource[] =(B"000",befehl[2..0]);
+					regdest[] =(B"000111");	--A
+					addFlags=VCC;
+					add_in[0]=GND;
+					add_in[19]=VCC;
+					reginipout=VCC;
+					addop2=VCC;
+				
+			--CMP A,(HL)
+			WHEN B"0010111110"
+				=>	memstat[]=B"10";	--LD EReg,(HL)
+					regdest[] =(B"100100");
+					faster=VCC;
+					micronext[]=24;
+					next=VCC;
+					
+			--RET cc
+			WHEN B"0011000000",B"0011001000",B"0011010000",B"0011011000", 
+				 B"0011100000",B"0011101000",B"0011110000",B"0011111000"
+				=>	IF con2 THEN
+					 	regdest[]   =B"101110";	-- (sp)+
+						reginipout=VCC;
+						n_regwr=VCC;
+						memstat[]=B"10";
+						micronext[]=8;
+						next=VCC;
+					ELSE
+						slower=VCC;	
+					END IF;	
+				 	
+			--POP DReg			
+			WHEN B"0011000001",B"0011010001",B"0011100001",B"0011110001" 
+				=> 	regdest[]   =B"101110";	-- (sp)+
+					reginipout=VCC;
+					n_regwr=VCC;
+					memstat[]=B"10";
+--					slower=VCC;
+					IF befehl[5..4]==B"11" THEN
+						micronext[]=31;	--POP AF
+					ELSE
+						micronext[]=29;
+					END IF;	
+					next=VCC;
+					
+			--JP cc			
+			WHEN B"0011000010",B"0011001010",B"0011010010",B"0011011010", 
+				 B"0011100010",B"0011101010",B"0011110010",B"0011111010"
+				=>	IF con2 THEN
+					 	micronext[]=3;
+					ELSE
+					 	micronext[]=7;
+					END IF;
+					next=VCC;
+
+			--JP nn			
+			WHEN B"0011000011" 
+				=> 	micronext[]=3;
+					next=VCC;
+					
+			--OUT (n), IN (n)
+			WHEN B"0011010011", B"0011011011"
+				=>	memdir=VCC;
+					d_memaddr[]=(OP1out[7..0],ramdatain[]);
+--					regdest[] =(B"000111");	--A
+					regsource[] =(B"000111");	--A
+					memstat[]=(B"1",NOT befehl[3]);
+					micronext[]=37;
+					next=VCC;
+					
+			--EX (SP),HL			
+			WHEN B"0011100011" 
+				=> 	regdest[]   =B"101110";	-- (sp)
+					memstat[]=B"10";
+					slower=VCC;
+					micronext[]=38;
+					next=VCC;
+					
+			--DI			
+			WHEN B"0011110011" 
+				=>	IFF[].ena=stat[]==B"00";
+					noint=VCC;
+			
+			--CALL cc			
+			WHEN B"0011000100",B"0011001100",B"0011010100",B"0011011100", 
+				 B"0011100100",B"0011101100",B"0011110100",B"0011111100"
+				=>	IF con2 THEN
+					 	micronext[]=4;
+					ELSE
+					 	micronext[]=7;
+					END IF;
+					next=VCC;
+
+			--PUSH DReg			
+			WHEN B"0011000101",B"0011010101",B"0011100101",B"0011110101" 
+				=> 	regdest[]   =B"101110";	-- (sp)+
+					add_in[1..0]=GND;		--sub 01
+					reginipout=VCC;
+					n_regwr=VCC;
+					prestore=VCC;
+					memstat[]=B"11";
+					slower=VCC;
+					IF befehl[5..4]==B"11" THEN
+						micronext[]=35;	--POP AF
+						regsource[]=(B"000111");	--A
+					ELSE
+						micronext[]=33;
+						regsource[]=(B"000",befehl[5..4],B"0");	--HReg
+					END IF;	
+					next=VCC;
+					
+			--ADD/ADC/SUB/SBC A,n
+			WHEN B"0011000110",B"0011001110",B"0011010110",B"0011011110"
+				=>	micronext[]=22;
+					next=VCC;
+			
+			--AND/XOR/OR A,n
+			WHEN B"0011100110",B"0011101110",B"0011110110"
+				=>	micronext[]=28;
+					next=VCC;
+			
+			--CMP A,n
+			WHEN B"0011111110"
+				=>	micronext[]=23;
+					next=VCC;
+			
+			--RST n			
+			WHEN B"0011000111",B"0011001111",B"0011010111",B"0011011111", 
+				 B"0011100111",B"0011101111",B"0011110111",B"0011111111" 
+				=> 	--n_count[]=0;
+					halt=VCC;
+					regdest[]   =B"101110";	-- -(sp)
+					add_in[1..0]=GND;		--sub 01
+					reginipout=VCC;
+					n_regwr=VCC;
+					prestore=VCC;
+					memstat[]=B"11";
+					micronext[]=10;
+					next=VCC;
+					
+			--RET/RETI/RETN			
+			WHEN B"0011001001", 
+ 				 B"1001000101",B"1001001101",B"1001010101",B"1001011101",
+				 B"1001100101",B"1001101101",B"1001110101",B"1001111101"
+				=> 	regdest[]   =B"101110";	-- -(sp)
+					faster=VCC;
+					reginipout=VCC;
+					n_regwr=VCC;
+					memstat[]=B"10";
+					micronext[]=8;
+					next=VCC;
+				 	
+			--exx
+			WHEN B"0011011001" => 
+				exx= NOT exx;
+				exx.ena=VCC;
+				exde=exdeb;
+				exdeb=exde;
+				(exde, exdeb).ena=VCC;
+				
+			--JP (HL)
+			WHEN B"0011101001" => 
+					faster=VCC;
+					memstat[]=B"01";
+					regdest[] =(B"100100");
+					PCdirekt=VCC;
+					Z80PC[]=OP1out[];
+					Z80PC[].ena=VCC;
+				
+			--LD sp,hl
+			WHEN B"0011111001" => 
+					slower=VCC;
+					regdest[]   =B"101110";	-- -(sp)
+					regsource[] =B"100100";	--HL
+					n_regwr=VCC;
+					regin[]=OP2out[];
+				
+			--CB
+			WHEN B"0011001011" => 
+				prefix[0]=VCC;
+				prefix[0].ena=stat[]==B"00";
+				wasidx=VCC;
+
+			--ex de,hl
+			WHEN B"0011101011" 
+				=>	exde= NOT exde;
+					exde.ena=VCC;
+				
+			--EI			
+			WHEN B"0011111011" 
+				=>	IFF[].ena=stat[]==B"00";
+					IFF[]=VCC;
+					noint=VCC;
+			--Call nn			
+			WHEN B"0011001101" 
+				=> 	micronext[]=4;
+					next=VCC;
+
+			--DD/FD			
+			WHEN B"0011011101",B"0011111101" => 
+				prefix[3..2]=(B"1",befehl[5]);
+				prefix[3..2].ena=stat[]==B"00";
+				wasidx=VCC;
+				
+			--ED			
+			WHEN B"0011101101" => 
+				prefix[3..2]=B"00";
+				prefix[1]=VCC;
+				prefix[3..1].ena=stat[]==B"00";		
+
+
+---------------------------------------------------------------------
+--ED - Befehle	
+	
+			--OUT (C), IN (C)
+			WHEN B"1001000000",B"1001010000",B"1001100000",B"1001110000",
+				 B"1001001000",B"1001011000",B"1001101000",B"1001111000",
+				 B"1001000001",B"1001010001",B"1001100001",B"1001110001",
+				 B"1001001001",B"1001011001",B"1001101001",B"1001111001"
+				=>	memdir=VCC;
+					nop=VCC;
+					regdest[] =(B"100000");	--BC
+					d_memaddr[]=OP1out[];
+					regsource[] =(B"000",befehl[5..3]);	--ERegh
+					memstat[]=(B"1", befehl[0]);
+					micronext[]=45;
+					next=VCC;
+					
+			--ADC HL,DReg, SBC HL,DReg
+			WHEN B"1001000010",B"1001010010",B"1001100010",B"1001110010",
+				 B"1001001010",B"1001011010",B"1001101010",B"1001111010"
+				 =>	regsource[]=(B"101",befehl[5..4],B"0");
+					regdest[] =(B"100100");	--HL
+					slower=VCC;
+					memstat[]=B"01";
+					nop=VCC;
+					addFlags=VCC;
+					flags16=VCC;
+					n_regwr=VCC;
+					add_in[0]=befehl[3];
+					add_in[19]=Z80Flags[0] XOR NOT befehl[3];
+					reginipout=VCC;
+					addop2=VCC;
+					
+			--LDI/LDD/LDIR/LDDR
+			WHEN B"1010100000",B"1010101000",B"1010110000",B"1010111000"
+				=> 	regdest[]   =B"101100";	-- (HL)+
+					add_in[1..0]=NOT befehl[3];
+					reginipout=VCC;
+					n_regwr=VCC;
+					slower=VCC;
+					memstat[]=B"10";
+					micronext[]=48;
+					next=VCC;
+					
+			--CPI/CPR/CPIR/CPDR
+			WHEN B"1010100001",B"1010101001",B"1010110001",B"1010111001"
+				=> 	regdest[]   =B"101100";	-- (HL)+
+					add_in[1..0]=NOT befehl[3];
+					reginipout=VCC;
+					n_regwr=VCC;
+					memstat[]=B"10";
+					micronext[]=50;
+					next=VCC;
+					
+			--INI/INR/INIR/INDR
+			WHEN B"1010100010",B"1010101010",B"1010110010",B"1010111010"
+				=> 	regdest[]   =B"100000";	-- (BC)
+					memstat[]=B"10";
+					slower=VCC;
+					micronext[]=52;
+					next=VCC;
+					
+			--OUTI/OUTR/OTIR/OTDR
+			WHEN B"1010100011",B"1010101011",B"1010110011",B"1010111011"
+				=> 	regdest[]   =B"101100";	-- (HL)+
+					add_in[1..0]=NOT befehl[3];
+					reginipout=VCC;
+					n_regwr=VCC;
+					memstat[]=B"10";
+					micronext[]=54;
+					next=VCC;
+					
+			--LD I,A
+			WHEN B"1001000111"
+				=> 	regdest[]=B"011111"; 	--I
+					regsource[]=B"000111";	--A
+					slower=VCC;
+					n_regwr=VCC;
+					regin[7..0]=OP2out[7..0];
+							
+			--LD A,I
+			WHEN B"1001010111"
+				=> 	regdest[]=B"000111";	--A
+					regsource[]=B"011111"; 	--I
+					slower=VCC;
+					n_regwr=VCC;
+					regin[7..0]=OP2out[7..0];
+					logflags=VCC;
+					saveCFlag=VCC;
+					PFlagdir=VCC;
+					Z80Flags[2]=IFF[0];
+							
+			--LD R,A
+			WHEN B"1001001111"
+				=> 	regsource[]=B"000111";	--A
+					slower=VCC;
+					n_refresh[]=OP2out[7..0];
+					setrefresh=VCC;
+					n_refresh[].ena=VCC;
+											
+			--LD A,R
+			WHEN B"1001011111"
+				=> 	regdest[]=B"000111";	--A
+					slower=VCC;
+					n_regwr=VCC;
+					regin[7..0]=n_refresh[];
+					logflags=VCC;
+					saveCFlag=VCC;
+					PFlagdir=VCC;
+					Z80Flags[2]=IFF[0];
+									
+			--NEG
+			WHEN B"1001000100",B"1001001100",B"1001010100",B"1001011100",
+				 B"1001100100",B"1001101100",B"1001110100",B"1001111100"
+				 =>	regsource[] =(B"000111");	--A
+					regdest[] =(B"000111");	--A
+					addFlags=VCC;
+					n_regwr=VCC;
+					add_in[0]=GND;
+					add_in[19]=VCC;
+					reginipout=VCC;
+					addop2=VCC;
+					nullop1=VCC;
+									
+			--RRD/RLD
+			WHEN B"1001100111",B"1001101111"
+				=>	memstat[]=B"10";	
+					regdest[] =(B"100100");
+					micronext[]=83;
+					next=VCC;
+				
+					
+					
+		END CASE;	
+		END IF;
+	END IF;	
+---------------------------------------------------------------------
+--CB - Befehle		
+		IF prefix[1..0] == B"01" THEN
+			IF prefix[3]  THEN
+				nxdir=VCC;
+				befehl[].ena=VCC;
+				clone=VCC;
+			END IF;	
+			IF prefix[3] OR (befehl[2..0]==B"110") THEN
+				memstat[]=B"10";	--CB_TAB,(HL)
+				regdest[] =(B"100100");
+				faster=VCC;
+				micronext[]=42;
+				next=VCC;
+			ELSE
+				regdest[]=(B"000",befehl[2..0]);
+				cb_tab=VCC;
+			END IF;
+		END IF;	
+----------------------------------------------------------------------
+-- MICROCODE
+----------------------------------------------------------------------			
+		CASE (prefix[1..0],microaddr[]) IS
+
+	--ld (hl),n
+			WHEN B"1100000000"
+				 =>	wrdir=VCC;
+					direkt[]=nxbefehl[];
+					memstat[]=B"01";
+					ixye=VCC;
+
+	--djnz e, jr e
+			WHEN B"1100000001"
+				 =>	n_count[7..0]=nxbefehl[];
+					n_count[15..8]=nxbefehl[7];
+					memstat[]=B"01";
+
+	--ld DReg,nn
+			WHEN B"1100000010"
+				 =>	regdest[]   =(B"101",befehl[5..4],B"0");
+					n_regwr=VCC;
+					memstat[]=B"01";
+					regin[]=(ramdatain[],nxbefehl[]);
+
+	--JP nn
+			WHEN B"1100000011"
+				 =>	PCdirekt=VCC;
+					memstat[]=B"01";
+					Z80PC[]=(ramdatain[],nxbefehl[]);
+
+	--call nn
+			WHEN B"1100000100"
+				 =>	regdest[]   =B"101110";	-- -(sp)
+					add_in[1..0]=GND;		--sub
+					reginipout=VCC;
+--					regin[]=n_ipout[];
+					prestore=VCC;
+					n_regwr=VCC;
+					memstat[]=B"11";
+					next=VCC;
+			WHEN B"1100000101"
+				 =>	regdest[]   =B"101110";	-- -(sp)
+					add_in[1..0]=GND;		--sub
+					reginipout=VCC;
+--					regin[]=n_ipout[];
+					prestore=VCC;
+					n_regwr=VCC;
+					memstat[]=B"11";
+					direkt[]=Z80PC[15..8];
+					wrdir=VCC;
+					next=VCC;
+			WHEN B"1100000110"
+				 =>	memstat[]=B"01";
+					wrdir=VCC;
+					direkt[]=Z80PC[7..0];
+					PCdirekt=VCC;
+					Z80PC[].ena=VCC;
+					Z80PC[]=(nxbefehl[],n_Y[]);
+
+	--nop
+			WHEN B"1100000111"
+				 =>	memstat[]=B"01";
+	--ret
+			WHEN B"1100001000"
+				 =>	regdest[]=B"101110";	-- -(sp)
+					reginipout=VCC;
+					n_regwr=VCC;
+					rddir=VCC;
+					memstat[]=B"10";
+					PCdirekt=VCC;
+					Z80PC[7..0]=ramdatain[];
+					Z80PC[7..0].ena=VCC;
+					next=VCC;
+			WHEN B"1100001001"
+				 =>	PCdirekt=VCC;
+					memstat[]=B"01";
+					rddir=VCC;
+					Z80PC[15..8]=ramdatain[];
+					Z80PC[15..8].ena=VCC;
+
+	--RST n				
+			WHEN B"1100001010"
+				 =>	direkt[]=Z80PC[15..8];
+					wrdir=VCC;
+					regdest[]=B"101110";	-- -(sp)
+					add_in[1..0]=GND;		--sub 01
+					reginipout=VCC;
+					prestore=VCC;
+					n_regwr=VCC;
+					memstat[]=B"11";
+					next=VCC;
+			WHEN B"1100001011"
+				 =>	memstat[]=B"01";
+					direkt[]=Z80PC[7..0];
+					wrdir=VCC;
+					PCdirekt=VCC;
+					Z80PC[]=(B"0000000000",befehl[5..3],B"000");
+					Z80PC[].ena=VCC;
+					
+	--LD A,(nn),A 
+			WHEN B"1100001100"	--12
+				=>	memdir=VCC;
+					d_memaddr[]=(ramdatain[],nxbefehl[]);
+					memstat[]=(B"1",NOT befehl[3]);
+					regsource[] =B"000111";	--A
+					next=VCC;
+			WHEN B"1100001101"				--13	
+				=>	regdest[] =B"000111";	--A
+					memstat[]=B"01";
+					
+	--LD Dreg,(nn),DReg  
+			WHEN B"1100001110"	--14
+				=>	memdir=VCC;
+					d_memaddr[]=(ramdatain[],nxbefehl[]);
+					regsource[] =(B"001", befehl[5..4],B"1");	--DRegl
+					memstat[]=(B"1",NOT befehl[3]);
+					next=VCC;
+			WHEN B"1100001111"	--15				
+				=>	prestore=VCC;
+					adde=VCC;
+					regdest[] =(B"001", befehl[5..4],B"1");	--DRegl
+					regsource[] =(B"001", befehl[5..4],B"0");	--DRegh
+					n_regwr=befehl[3];
+					memstat[]=(B"1",NOT befehl[3]);
+					next=VCC;
+			WHEN B"1100010000"					
+				=>	regdest[] =(B"001", befehl[5..4],B"0");	--DRegh
+					n_regwr=befehl[3];
+					memstat[]=B"01";
+		
+		
+	--INC (HL), DEC (HL)
+			WHEN B"1100010001"	--17
+				=>	ixye=VCC;
+					regdest[]=(B"000",befehl[5..3]);--tmp
+					next=VCC;					
+			WHEN B"1100010010"					
+				=>	reginipout=VCC;		--für Flags
+					--n_regwr=VCC;
+					regdest[]=(B"000",befehl[5..3]);--tmp
+					add_in[0]=NOT befehl[0];		--add 01/sub 01
+					add_in[19]=befehl[0];		--add 01/sub 01
+					addFlags=VCC;
+					saveCFlag=VCC;
+					n_X[]=n_ergebnis[7..0];
+					n_X[].ena=VCC;
+					memstat[]=B"11";	--LD (HL),EReg
+					nop=VCC;
+					next=VCC;					
+			WHEN B"1100010011"				
+				=>	wrdir=VCC;
+					direkt[]=n_X[];
+
+			--ADD/ADC/SUB/SBC a,(HL)	
+			WHEN B"1100010100",B"1100011000",B"1100011010"
+				=>	ixye=VCC;
+					regdest[]=(B"000",befehl[2..0]);--tmp
+					next=VCC;					
+			WHEN B"1100010101"				
+				 =>	regsource[] =(B"000",befehl[2..0]);--tmp
+					regdest[] =(B"000111");	--A
+					addFlags=VCC;
+					n_regwr=VCC;
+					add_in[0]=NOT befehl[4];
+					add_in[19]=(Z80Flags[0]AND befehl[3]) XOR befehl[4];
+					reginipout=VCC;
+					addop2=VCC;
+					nop=VCC;
+
+			--ADD/ADC/SUB/SBC a,n	
+			WHEN B"1100010110"				
+				 =>	regdest[] =(B"000111");	--A
+					addFlags=VCC;
+					n_regwr=VCC;
+					add_in[0]=NOT befehl[4];
+					add_in[19]=(Z80Flags[0]AND befehl[3]) XOR befehl[4];
+					reginipout=VCC;
+					add_in[8..1]=nxbefehl[];
+
+			--CMP a,n	
+			WHEN B"1100010111"				
+				 =>	regdest[] =(B"000111");	--A
+					addFlags=VCC;
+					add_in[0]=GND;
+					add_in[19]=VCC;
+					reginipout=VCC;
+					add_in[8..1]=nxbefehl[];
+					
+			--CMP a,(HL)	
+			WHEN B"1100011001"				
+				 =>	regsource[] =(B"000",befehl[2..0]);--tmp
+					regdest[] =(B"000111");	--A
+					addFlags=VCC;
+					add_in[0]=GND;
+					add_in[19]=VCC;
+					reginipout=VCC;
+					addop2=VCC;
+					nop=VCC;
+					
+			--AND/XOR/OR A,(HL)
+			WHEN B"1100011011"
+				 =>	regsource[] =(B"000",befehl[2..0]);
+					regdest[] =(B"000111");	--A
+					logFlags=VCC;
+					Z80Flags[4]=(befehl[4..3]==B"00");
+					n_regwr=VCC;
+					regin[7..0]=logout[];
+					addop2=VCC;
+					nop=VCC;
+
+			--AND/XOR/OR A,n
+			WHEN B"1100011100"	--28
+				 =>	regdest[] =(B"000111");	--A
+					logFlags=VCC;
+					Z80Flags[4]=(befehl[4..3]==B"00");
+					n_regwr=VCC;
+					regin[7..0]=logout[];
+					login[]=nxbefehl[];
+
+	--POP DReg
+			WHEN B"1100011101",B"1100011111"	--29/31
+				 =>	regdest[]=B"101110";	-- (sp)+
+					reginipout=VCC;
+					n_regwr=VCC;
+					rddir=VCC;
+					memstat[]=B"10";
+					n_X[7..0]=ramdatain[];
+					n_X[7..0].ena=VCC;
+					next=VCC;
+			WHEN B"1100011110"	--30
+				 =>	rddir=VCC;
+					regdest[] =(B"101",befehl[5..4],B"0");
+					n_regwr=VCC;
+					regin[]=(ramdatain[],n_X[]);
+			--POP AF		
+			WHEN B"1100100000"	--32
+				 =>	--rddir=VCC;
+					regdest[] =(B"000111");		--A
+					Z80Flags[]=n_X[];
+					Z80Flags[].ena=VCC;
+					--n_regwr=VCC;
+					--regin[]=(ramdatain[],n_Y[]);
+					
+	--PUSH DReg				
+			WHEN B"1100100001"	--33
+				 =>	--direkt[]=OP2out[7..0];
+--					wrdir=VCC;
+--					regsource[]=(B"000",befehl[5..4],B"0");
+					regsource[]=(B"000",befehl[5..4],B"1");		--LReg
+					regdest[]=B"101110";	-- -(sp)
+					add_in[1..0]=GND;		--sub 01
+					reginipout=VCC;
+					prestore=VCC;
+					n_regwr=VCC;
+					memstat[]=B"11";
+					next=VCC;
+--			WHEN B"1100100010"
+--				 =>	direkt[]=OP2out[7..0];
+--					wrdir=VCC;
+--					regsource[]=(B"000",befehl[5..4],B"1");
+					
+	--PUSH AF			
+			WHEN B"1100100011"	--35
+				 =>	--direkt[]=OP2out[7..0];
+					--wrdir=VCC;
+--					regsource[]=(B"000111");
+					regdest[]=B"101110";	-- -(sp)
+					add_in[1..0]=GND;		--sub 01
+					reginipout=VCC;
+					prestore=VCC;
+					n_regwr=VCC;
+					memstat[]=B"11";
+					next=VCC;
+			WHEN B"1100100100"	--36
+				 =>	direkt[]=Z80Flags[];
+					wrdir=VCC;
+					
+	--IN/OUT (n)
+			WHEN B"1100100101"	--37					
+				=>	regdest[] =B"000111";	--A
+					memstat[]=B"01";
+					inout=VCC;
+--					rddir=VCC;
+--					regin[7..0]=IOdatain[];		--IO
+--					regdata.wren=befehl[3];
+					
+	--EX (SP),HL			
+			WHEN B"1100100110"	--38 
+				=> 	memstat[]=B"11";
+					regdest[]=B"000101";		--L
+					n_X[]=OP1out[7..0];
+					n_X[].ena=VCC;
+					next=VCC;
+			WHEN B"1100100111"	--39 
+				=> 	regdest[]   =B"101110";	-- (sp)
+					prestore=VCC;
+					memstat[]=B"10";
+					wrdir=VCC;
+					direkt[]=n_X[];
+					next=VCC;
+			WHEN B"1100101000"	--40 
+				=> 	memstat[]=B"11";
+					regdest[]=B"000100";		--H
+					n_X[]=OP1out[7..0];
+					n_X[].ena=VCC;
+					next=VCC;
+			WHEN B"1100101001"	--41 
+				=> 	wrdir=VCC;
+					direkt[]=n_X[];
+
+	-- CB-TAB
+			WHEN B"1100101010"	--42					
+				=>	regdest[]=regrot[];
+					next=VCC;					
+					ixye=VCC;
+			WHEN B"1100101011"	--43			
+				=>	cb_tab=VCC;
+					regdest[]=regrot[];
+					IF n_regwr THEN
+						next=VCC;					
+						memstat[]=B"11";	--LD (HL),rot
+					END IF;
+					nop=VCC;
+			WHEN B"1100101100"	--44			
+				=> 	wrdir=VCC;
+					direkt[]=n_X[];
+
+	--IN/OUT (C)
+			WHEN B"1100101101"	--45					
+				=>	regdest[] =(B"000",befehl[5..3]);	--ERegh
+					inout=VCC;
+					logFlags=NOT befehl[0];
+					saveCFlag=VCC;
+					memstat[]=B"01";
+					
+	--LDI/LDR/LDIR/LDDR
+			WHEN B"1100110000"	--48					
+				 =>	regdest[]=B"101010";	-- (de)+
+					add_in[1..0]=NOT befehl[3];
+					reginipout=VCC;
+					n_regwr=VCC;
+					rddir=VCC;
+					memstat[]=B"11";
+					n_X[7..0]=ramdatain[];
+					n_X[7..0].ena=VCC;
+					next=VCC;
+			WHEN B"1100110001"	--49					
+				 =>	regdest[]=B"101000";	-- (bc)-
+					add_in[1..0]=GND;
+					reginipout=VCC;
+					n_regwr=VCC;
+					direkt[]=n_X[7..0];
+					wrdir=VCC;
+					Z80Flags[4].ena=VCC;	--H
+					Z80Flags[2].ena=VCC;	--V
+					Z80Flags[1].ena=VCC;	--N
+					IF OP1out[]!=B"0000000000000001" THEN
+						Z80Flags[2]=VCC;
+						IF befehl[4] THEN
+							n_count[]=-3;
+							memstat[]=B"01";
+							Z80PC[].ena=VCC;
+						END IF;
+					END IF;
+					
+	--CPI/CPR/CPIR/CPDR
+			WHEN B"1100110010"	--50					
+				 =>	regdest[]=B"101000";	-- (bc)-
+					add_in[1..0]=GND;
+					reginipout=VCC;
+					n_regwr=VCC;
+					rddir=VCC;
+					n_X[7..0]=ramdatain[];
+					n_X[7..0].ena=VCC;
+					next=VCC;
+			WHEN B"1100110011"	--51					
+				 =>	regdest[]=B"000111";	-- A
+					add_in[0]=GND;
+					add_in[19]=VCC;
+					add_in[8..1]=n_X[];
+					reginipout=VCC;
+					nop=VCC;
+					addFlags=VCC;
+					saveCFlag=VCC;
+					PFlagdir=VCC;
+--					Z80Flags[7]=regin[7];	--S
+--					Z80Flags[6]=n_zflagl;	--Z
+--					Z80Flags[7].ena=VCC;	--S
+--					Z80Flags[6].ena=VCC;	--Z
+--					Z80Flags[4].ena=VCC;	--H
+--					Z80Flags[2].ena=VCC;	--V
+--					Z80Flags[1]=VCC;	--N
+--					Z80Flags[1].ena=VCC;	--N
+					IF NOT lastz THEN
+						Z80Flags[2]=VCC;
+						IF befehl[4] AND NOT n_zflagl THEN
+							slower=VCC;
+							n_count[]=-3;
+							memstat[]=B"01";
+							Z80PC[].ena=VCC;
+						END IF;
+					END IF;
+										
+	--INI/INR/INIR/INDR
+			WHEN B"1100110100"	--52					
+				=>	regdest[]=B"101100";	-- (hl)+
+					add_in[1..0]=NOT befehl[3];
+					reginipout=VCC;
+					n_regwr=VCC;
+					rddir=VCC;
+					memstat[]=B"11";
+					n_X[7..0]=IOdatain[];
+					n_X[7..0].ena=VCC;
+					inout=VCC;
+					next=VCC;		
+			WHEN B"1100110101"	--53					
+				 =>	regdest[]=B"000000";	-- b-1
+					add_in[0]=GND;
+					add_in[19]=VCC;
+					reginipout=VCC;
+					n_regwr=VCC;
+					direkt[]=n_X[7..0];
+					wrdir=VCC;
+					addFlags=VCC;
+					saveCFlag=VCC;
+					IF OP1out[7..0]!=B"00000001" THEN
+						IF befehl[4] THEN
+							n_count[]=-3;
+							memstat[]=B"01";
+							Z80PC[].ena=VCC;
+						END IF;
+					END IF;
+								
+	--OUTI/OUTR/OTIR/OTDR
+			WHEN B"1100110110"	--54					
+				=> 	regdest[]=B"000000";	-- b-1
+					add_in[0]=GND;
+					add_in[19]=VCC;
+					reginipout=VCC;
+					n_regwr=VCC;
+					addFlags=VCC;
+					saveCFlag=VCC;
+					n_X[7..0]=ramdatain[];
+					n_X[7..0].ena=VCC;
+					rddir=VCC;
+					next=VCC;
+					
+--				=> 	regdest[]   =B"101100";	-- (HL)+
+--					add_in[1..0]=NOT befehl[3];
+--					reginipout=VCC;
+--					n_regwr=VCC;
+--					memstat[]=B"10";
+--					next=VCC;
+--					nop=VCC;
+			WHEN B"1100110111"	--55					
+				=>	regdest[]=B"100000";	-- (bc)
+					memstat[]=B"11";
+					next=VCC;		
+					nop=VCC;
+			WHEN B"1100111000"	--56					
+				=>	inout=VCC;
+					direkt[]=n_X[7..0];
+					wrdir=VCC;
+					IF NOT Z80Flags[6] THEN
+						IF befehl[4] THEN
+							n_count[]=-3;
+							memstat[]=B"01";
+							Z80PC[].ena=VCC;
+						END IF;
+					END IF;
+					
+	--Interrupt		
+			WHEN B"1101010000"	--80 
+				=> 	regdest[]   =B"101110";	-- -(sp)
+					halt=VCC;
+					add_in[1..0]=GND;		--sub 01
+					reginipout=VCC;
+					n_regwr=VCC;
+					prestore=VCC;
+					memstat[]=B"11";
+					next=VCC;
+--TMP 
+		faster=VCC;					
+			WHEN B"1101010001"	--81 
+				 =>	direkt[]=Z80PC[15..8];
+					wrdir=VCC;
+					regdest[]=B"101110";	-- -(sp)
+					add_in[1..0]=GND;		--sub 01
+					reginipout=VCC;
+					prestore=VCC;
+					n_regwr=VCC;
+					memstat[]=B"11";
+					next=VCC;
+			WHEN B"1101010010"	--82 
+				 =>	memstat[]=B"01";
+					direkt[]=Z80PC[7..0];
+					wrdir=VCC;
+					PCdirekt=VCC;
+					Z80PC[]=(B"0000000000111000");
+					Z80PC[].ena=VCC;
+
+			--RRD/RLD
+			WHEN B"1101010011"	--83					
+				=>	rddir=VCC;
+					n_X[7..0]=ramdatain[];
+					n_X[7..0].ena=VCC;
+					next=VCC;					
+			WHEN B"1101010100"	--84			
+				=>	regdest[]=B"000111";	--A
+					IF befehl[3] THEN	--RLD
+						regin[7..0]=(OP1out[7..4], n_X[7..4]);
+						n_X[]=(n_X[3..0],OP1out[3..0]);
+					ELSE				--RRD
+						regin[7..0]=(OP1out[7..4], n_X[3..0]);
+						n_X[]=(OP1out[3..0],n_X[7..4]);
+					END IF;
+					n_regwr=VCC;
+					logFlags=VCC;
+					saveCFlag=VCC;
+					n_X[7..0].ena=VCC;
+					next=VCC;					
+					memstat[]=B"11";	
+					nop=VCC;
+			WHEN B"1101010101"	--85			
+				=>	direkt[]=n_X[];
+					wrdir=VCC;
+			--ex de,hl
+--			WHEN B"1101010110"	--86 
+--				=>	regdest[]   =B"100100";	--HL
+--					n_regwr=VCC;
+--					regin[]=d_memaddr[];
+		END CASE;
+		
+		
+		IF befehl[7..6]==B"01" THEN
+			regrot[]=B"000110";		--tmp
+		ELSE		
+			regrot[]=(B"000",befehl[2..0]);
+		END IF;
+		
+		CASE befehl[4..3] IS
+			WHEN B"00" => con1=NOT Z80Flags[6];
+			WHEN B"01" => con1=Z80Flags[6];
+			WHEN B"10" => con1=NOT Z80Flags[0];
+			WHEN B"11" => con1=Z80Flags[0];
+		END CASE;
+		CASE befehl[5..3] IS
+--			WHEN B"000" => con2=NOT Z80Flags[6];
+--			WHEN B"001" => con2=Z80Flags[6];
+--			WHEN B"010" => con2=NOT Z80Flags[0];
+--			WHEN B"011" => con2=Z80Flags[0];
+			WHEN B"100" => con2=NOT Z80Flags[2];
+			WHEN B"101" => con2=Z80Flags[2];
+			WHEN B"110" => con2=NOT Z80Flags[7];
+			WHEN B"111" => con2=Z80Flags[7];
+			WHEN OTHERS => con2=con1;
+		END CASE;
+		CASE befehl[4..3] IS
+			WHEN B"00" => logout[]=OP1out[7..0] AND login[];
+			WHEN B"01" => logout[]=OP1out[7..0] XOR login[];
+			WHEN OTHERS => logout[]=OP1out[7..0] OR login[];
+		END CASE;
+		
+		IF cb_tab THEN	--CB 
+			n_X[]=regin[7..0];
+			n_X[].ena=VCC;
+			CASE befehl[7..6] IS
+				WHEN B"00" =>			--rotate
+					regin[7..0]=rotout[];
+					n_regwr=VCC;
+					logFlags=VCC;
+					Z80flags[0]=rotcout;
+				WHEN B"01" =>			--bit	
+					regin[7..0]=OP1out[7..0] AND bitmask[];
+					Z80Flags[4]=VCC;
+					logFlags=VCC;
+					saveCFlag=VCC;
+					clearXY=VCC;
+				
+--					Z80Flags[6]=(OP1out[7..0] AND bitmask[])==0;
+--					Z80Flags[4]=VCC;
+--					Z80Flags[7].ena=VCC;	--S
+--					Z80Flags[6].ena=VCC;	--Z
+--					Z80Flags[4].ena=VCC;	--H
+--					Z80Flags[2].ena=VCC;	--V
+--					Z80Flags[1].ena=VCC;	--N
+				WHEN B"10" =>			--res
+					regin[7..0]=OP1out[7..0] AND NOT bitmask[]; 
+					n_regwr=VCC;
+				WHEN B"11" =>			--set
+					regin[7..0]=OP1out[7..0] OR bitmask[];
+					n_regwr=VCC;
+			END CASE;		
+		END IF;
+	
+		CASE befehl[5..3] IS
+			WHEN B"000" => 	rotout[7..0]=(OP1out[6..0],OP1out[7]); --RLC
+							rotcout=OP1out[7];
+			WHEN B"001" => 	rotout[7..0]=(OP1out[0],OP1out[7..1]); --RRC
+							rotcout=OP1out[0];
+			WHEN B"010" => 	rotout[7..0]=(OP1out[6..0],Z80Flags[0]); --RL
+							rotcout=OP1out[7];
+			WHEN B"011" => 	rotout[7..0]=(Z80Flags[0],OP1out[7..1]); --RR
+							rotcout=OP1out[0];
+			WHEN B"100" => 	rotout[7..0]=(OP1out[6..0],GND); --SLA
+							rotcout=OP1out[7];
+			WHEN B"101" => 	rotout[7..0]=(OP1out[7],OP1out[7..1]); --SRA
+							rotcout=OP1out[0];
+			WHEN B"110" => 	rotout[7..0]=(OP1out[6..0],VCC); 
+							rotcout=OP1out[7];
+			WHEN B"111" => 	rotout[7..0]=(GND,OP1out[7..1]); --SRL
+							rotcout=OP1out[0];
+		END CASE;
+		TABLE
+  			befehl[5..3]   =>      bitmask[];
+ 		       	B"000"        =>      B"00000001";
+ 		       	B"001"        =>      B"00000010";
+ 		       	B"010"        =>      B"00000100";
+ 		       	B"011"        =>      B"00001000";
+              	B"100"        =>      B"00010000";
+              	B"101"        =>      B"00100000";
+              	B"110"        =>      B"01000000";
+              	B"111"        =>      B"10000000";
+		END TABLE;
+
+	
+
+
+END;

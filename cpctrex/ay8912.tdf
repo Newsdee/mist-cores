@@ -1,0 +1,455 @@
+-- C-One reconfigurable computer
+-- http://c64upgra.de/c-one/
+-- Subdesign C-One 
+--
+-- Copyright (c) 2005 Tobias Gubener
+--
+-- All rights reserved
+--
+-- Redistribution and use in source and synthezised forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+--
+-- Redistributions of source code must retain the above copyright notice,
+-- this list of conditions and the following disclaimer.
+--
+-- Redistributions in synthesized form must reproduce the above copyright
+-- notice, this list of conditions and the following disclaimer in the
+-- documentation and/or other materials provided with the distribution.
+--
+-- Neither the name of the author nor the names of other contributors may
+-- be used to endorse or promote products derived from this software without
+-- specific prior written permission.
+--
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+-- THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-- PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE
+-- LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+-- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+-- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+-- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+-- CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+-- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+-- POSSIBILITY OF SUCH DAMAGE.
+--
+
+ 
+SUBDESIGN ay8912 
+(	cpuclk						:INPUT;
+	reset						:INPUT;
+	cs							:INPUT;		--H-aktiv
+	bc0							:INPUT;		--
+	bdir						:INPUT;
+	PortAin[7..0]				:INPUT;
+	ioData[7..0]				:INPUT;
+	shiftclk					:INPUT;		--32MHz
+	key[7..0]					:INPUT;
+	oData[7..0]					:OUTPUT;
+	chanA[10..0]				:OUTPUT;
+	chanB[10..0]				:OUTPUT;
+	chanC[10..0]				:OUTPUT;
+	iauda						:OUTPUT;
+	lrclk						:OUTPUT;
+	bck							:OUTPUT;
+)
+VARIABLE
+	rechts[15..0]				:NODE;
+	links[15..0]				:NODE;
+	vclk,Hclk					:NODE;
+	vena,Hena					:NODE;
+	t_Data[7..0]				:TRI;
+	t_PortA[7..0]				:TRI;
+	t_PortB[7..0]				:TRI;
+	PSGReg[3..0]				:DFFE;
+	APeriode[11..0]				:DFFE;		--Reg 0,1
+	BPeriode[11..0]				:DFFE;		--Reg 2,3
+	CPeriode[11..0]				:DFFE;		--Reg 4,5
+	Noise[4..0]					:DFFE;		--Reg 6
+	enable[7..0]				:DFFE;		--Reg 7
+	AVol[4..0]					:DFFE;		--Reg 8
+	BVol[4..0]					:DFFE;		--Reg 9
+	CVol[4..0]					:DFFE;		--Reg 10
+	HPeriode[15..0]				:DFFE;		--Reg 11,12
+	HKurve[3..0]				:DFFE;		--Reg 13
+	PortA[7..0]					:DFFE;		--Reg 14
+	PortB[7..0]					:DFFE;		--Reg 15
+	AVollog[9..0]				:DFFE;		--Reg 8log
+	BVollog[9..0]				:DFFE;		--Reg 9log
+	CVollog[9..0]				:DFFE;		--Reg 10log
+	Alog[9..0]					:NODE;
+	Blog[9..0]					:NODE;
+	Clog[9..0]					:NODE;
+	HVollog[9..0]				:NODE;
+	ACount[11..0]				:DFFE;		
+	chanA[10..0]				:DFFE;
+	BCount[11..0]				:DFFE;
+	chanB[10..0] 				:DFFE;
+	CCount[11..0]				:DFFE;
+	chanC[10..0] 				:DFFE;
+	NCount[4..0]				:DFFE;
+	HCount[15..0]				:DFFE;		
+	HVol[4..0]					:DFFE;
+	nHVol[3..0]					:NODE;
+	HXor						:NODE;
+	HStart						:DFF;
+	Noisebit					:NODE;
+	RNG[16..0]					:DFFE;
+	Anot, Bnot, Cnot			:DFFE;
+	n_setreg					:NODE;
+	n_Pegel[9..0]				:NODE;
+	regwr						:NODE;
+	regwrd						:DFF;
+	
+	shiftcnt[8..0]	:DFF;
+	shift[15..0]	:DFFE;
+	iauda			:NODE;
+BEGIN
+DEFAULTS
+	RNG[]=GND;
+	t_Data[7..4].in=GND;
+	PSGReg[].ena=GND;
+	enable[].ena=GND;
+	APeriode[].ena=GND;
+	BPeriode[].ena=GND;
+	CPeriode[].ena=GND;
+	Noise[].ena=GND;
+	AVol[].ena=GND;
+	BVol[].ena=GND;
+	CVol[].ena=GND;
+	AVollog[].ena=GND;
+	BVollog[].ena=GND;
+	CVollog[].ena=GND;
+	HPeriode[].ena=GND;
+	HKurve[].ena=GND;
+	PortA[].ena=GND;
+	PortB[].ena=GND;
+	Anot.ena=GND;
+	Bnot.ena=GND;
+	Cnot.ena=GND;
+	HVol[].ena=GND;
+	RNG[].ena=GND;
+	HStart=VCC;
+END DEFAULTS;
+	(PSGReg[], APeriode[], BPeriode[],CPeriode[], Noise[], enable[]).clk=cpuclk;
+	(AVol[], BVol[], CVol[], HPeriode[], HKurve[], PortA[], PortB[], HStart).clk=cpuclk;
+	(AVollog[], BVollog[], CVollog[], regwrd).clk=cpuclk;
+	
+	t_PortA[].in=PortA[];
+	t_PortB[].in=PortB[];
+	PortA[]=ioData[];
+	PortB[]=ioData[];
+	PSGReg[]=ioData[3..0];
+	enable[]=ioData[] XOR B"00111111";
+	APeriode[7..0]=ioData[];
+	APeriode[11..8]=ioData[3..0];
+	BPeriode[7..0]=ioData[];
+	BPeriode[11..8]=ioData[3..0];
+	CPeriode[7..0]=ioData[];
+	CPeriode[11..8]=ioData[3..0];
+	Noise[]=ioData[4..0];
+	AVol[]=ioData[4..0];
+	BVol[]=ioData[4..0];
+	CVol[]=ioData[4..0];
+	AVollog[]=n_Pegel[];
+	BVollog[]=n_Pegel[];
+	CVollog[]=n_Pegel[];
+	HPeriode[7..0]=ioData[];
+	HPeriode[15..8]=ioData[];
+	HKurve[]=ioData[3..0];
+
+	Vclk=shiftclk;
+	vena=shiftcnt[7..0]==B"00000000";
+	Hclk=shiftclk;
+	hena=shiftcnt[]==B"000000000";
+
+	(ACount[], BCount[], CCount[], NCount[]).ena=vena;
+	HCount[].ena=hena;
+
+	(ACount[], Anot).clk=Vclk;
+	(BCount[], Bnot).clk=Vclk;
+	(CCount[], Cnot).clk=Vclk;
+	(HCount[], HVol[]).clk=Hclk;
+	(RNG[], NCount[]).clk=Vclk;
+	(chanA[], chanB[], chanC[]).clk=Vclk;
+	(chanA[], chanB[], chanC[]).ena=Vena;
+	t_PortA[7..0].oe=enable[6];
+	t_PortB[7..0].oe=enable[7];
+	t_Data[7..0].oe=bc0 AND NOT bdir;
+	oData[]=t_Data[];
+	(ACount[], Anot).clrn=reset;
+	(BCount[], Bnot).clrn=reset;
+	(CCount[], Cnot).clrn=reset;
+
+	n_setreg=bdir AND cs AND NOT bc0;
+
+			CASE PSGReg[] IS
+				WHEN 0 =>
+					t_Data[].in=Aperiode[7..0];
+				WHEN 1 =>
+					t_Data[3..0].in=Aperiode[11..8];
+				WHEN 2 =>
+					t_Data[].in=Bperiode[7..0];
+				WHEN 3 =>
+					t_Data[3..0].in=Bperiode[11..8];
+				WHEN 4 =>
+					t_Data[].in=Cperiode[7..0];
+				WHEN 5 =>
+					t_Data[3..0].in=Cperiode[11..8];
+				WHEN 6 =>
+					t_Data[4..0].in=Noise[];
+				WHEN 7 =>
+					t_Data[].in=enable[] XOR B"00111111";
+				WHEN 8 =>
+					t_Data[4..0].in=AVol[];
+				WHEN 9 =>
+					t_Data[4..0].in=BVol[];
+				WHEN 10 =>
+					t_Data[4..0].in=CVol[];
+				WHEN 11 =>
+					t_Data[].in=Hperiode[7..0];
+				WHEN 12 =>
+					t_Data[].in=Hperiode[15..8];
+				WHEN 13 =>
+					t_Data[3..0].in=HKurve[];
+				WHEN 14 =>
+					t_Data[].in=PortAin[];
+				WHEN 15 =>
+					t_Data[].in=PortB[];
+			END CASE;
+
+	regwr=bdir AND cs AND NOT bc0;
+	regwrd=regwr;
+	IF NOT reset THEN
+		enable[]=B"00000000";
+		enable[].ena=VCC;
+	ELSE
+		IF (bdir, bc0)==B"11" THEN
+			PSGReg[].ena=ioData[7..4]==B"0000";
+		ELSE
+			IF NOT regwr AND regwrd THEN
+				CASE PSGReg[] IS
+					WHEN 0 =>
+						APeriode[7..0].ena=VCC;
+					WHEN 1 =>
+						APeriode[11..8].ena=VCC;
+					WHEN 2 =>
+						BPeriode[7..0].ena=VCC;
+					WHEN 3 =>
+						BPeriode[11..8].ena=VCC;
+					WHEN 4 =>
+						CPeriode[7..0].ena=VCC;
+					WHEN 5 =>
+						CPeriode[11..8].ena=VCC;
+					WHEN 6 =>
+						Noise[].ena=VCC;
+					WHEN 7 =>
+						enable[].ena=VCC;
+					WHEN 8 =>
+						AVollog[].ena=VCC;
+						AVol[].ena=VCC;
+					WHEN 9 =>
+						BVollog[].ena=VCC;
+						BVol[].ena=VCC;
+					WHEN 10 =>
+						CVollog[].ena=VCC;
+						CVol[].ena=VCC;
+					WHEN 11 =>
+						HPeriode[7..0].ena=VCC;
+					WHEN 12 =>
+						HPeriode[15..8].ena=VCC;
+					WHEN 13 =>
+						HStart=GND;
+						HKurve[].ena=VCC;
+					WHEN 14 =>
+						PortA[].ena=VCC;
+					WHEN 15 =>
+						PortB[].ena=VCC;
+				END CASE;
+			END IF;
+		END IF;
+	END IF;
+
+IF key[0] THEN
+	IF AVol[4] THEN
+		Alog[]=HVollog[];
+	ELSE
+		Alog[]=AVollog[];
+	END IF;
+ELSE
+	Alog[]=0;
+END IF;	
+
+--	IF enable[3] OR enable[0] THEN
+		IF (enable[3] AND Noisebit) XOR (enable[0] AND Anot) THEN
+			chanA[]=(B"0", Alog[]);
+		ELSE
+--			chanA[]=0-(B"0", Alog[]);
+--		END IF;
+--	ELSE	
+		chanA[]=0;
+	END IF;
+
+	IF ACount[]<=1 THEN
+		ACount[]=APeriode[];
+--		Anot=NOT Anot AND(APeriode[] > 8);
+		Anot=NOT Anot OR(APeriode[] == 0);
+		Anot.ena=vena;
+	ELSE	
+		ACount[]=ACount[]-1;
+	END IF;
+
+IF key[1] THEN
+	IF BVol[4] THEN
+		Blog[]=HVollog[];
+	ELSE
+		Blog[]=BVollog[];
+	END IF;
+ELSE
+	Blog[]=0;
+END IF;	
+
+--	IF enable[4] OR enable[1] THEN
+		IF (enable[4] AND Noisebit) XOR (enable[1] AND Bnot) THEN
+			chanB[]=(GND, Blog[]);
+		ELSE
+--			chanB[]=0-(GND, Blog[]);
+--		END IF;
+--	ELSE	
+		chanB[]=0;
+	END IF;
+
+	IF BCount[]<=1 THEN
+		BCount[]=BPeriode[];
+--		Bnot=NOT Bnot AND(BPeriode[] > 8);
+		Bnot=NOT Bnot OR(BPeriode[] == 0);
+		Bnot.ena=vena;
+	ELSE	
+		BCount[]=BCount[]-1;
+	END IF;
+
+IF key[2] THEN
+	IF CVol[4] THEN
+		Clog[]=HVollog[];
+	ELSE
+		Clog[]=CVollog[];
+	END IF;
+ELSE
+	Clog[]=0;
+END IF;	
+
+--	IF enable[5] OR enable[2] THEN
+		IF (enable[5] AND Noisebit) XOR (enable[2] AND Cnot) THEN
+			chanC[]=(GND, Clog[]);
+		ELSE
+--			chanC[]=0-(GND, Clog[]);
+--		END IF;
+--	ELSE	
+		chanC[]=0;
+	END IF;
+
+	IF CCount[]<=1 THEN
+		CCount[]=CPeriode[];
+--		Cnot=NOT Cnot AND(CPeriode[] >8 );
+		Cnot=NOT Cnot OR(CPeriode[] == 0);
+		Cnot.ena=vena;
+	ELSE	
+		CCount[]=CCount[]-1;
+	END IF;
+	
+	RNG[16..0]=(NOT (RNG[0] XOR RNG[2]), RNG[16..1]);
+--	RNG[]=((RNG[0] XOR RNG[2]) OR RNG[]==0, RNG[16..1]);
+--	RNG[18..0]=(NOT (RNG[0] XOR RNG[2]), RNG[18..1]); --sehr gut
+--	RNG[18..0]=(NOT (RNG[0] XOR RNG[5]), RNG[18..1]); --sehr gut
+ 	Noisebit=RNG[0];-- AND (Noise[]!=0);
+	IF NCount[]<=1 THEN
+		NCount[]=Noise[];
+		RNG[].ena=(Noise[]!=0) AND vena;
+	ELSE	
+		NCount[]=NCount[]-1;
+	END IF;
+
+-- 	IF HCount[]>=HPeriode[] THEN
+--		HCount[]=1;
+----		HVol[].ena=(NOT HVol[4] OR (NOT HKurve[0] AND HKurve[3]));   --HOLD
+--		HVol[].ena=(NOT HVol[4] OR (NOT HKurve[0] AND HKurve[3])) AND (HPeriode[] != 0);   --HOLD
+--	ELSE	
+--		HCount[]=HCount[]+1;
+--	END IF;
+
+ 	IF HCount[]>=HPeriode[] THEN
+		HCount[]=1;
+		HVol[].ena=(NOT HVol[4] OR (NOT HKurve[0] AND HKurve[3])) AND hena AND (HPeriode[] != 0);   --HOLD
+	ELSE	
+		HCount[]=HCount[]+1;
+	END IF;
+
+--	(HVol[], HCount[]).clrn=AVol[4] OR BVol[4] OR CVol[4];
+	(HVol[], HCount[]).clrn=HStart;
+--	(HVol[]).clrn=HStart;
+	HVol[]=HVol[]+1;
+	nHVol[]=HVol[3..0] XOR (HXor, HXor, HXor, HXor);
+	HXor= (HKurve[3] OR NOT HVol[4]) AND  ( NOT HKurve[2] XOR ((HKurve[1] XOR HKurve[0]) AND HVol[4]));
+	TABLE
+        nHVol[3..0]	=>	HVollog[];
+			B"1111"	=>	H"2AA";		-- Umsetzung in logarithmische Werte in ca. 3dB Schritten
+			B"1110"	=>	H"1E2";		-- für Hüllkurve
+			B"1101"	=>	H"155";
+			B"1100"	=>	H"0F1";
+			B"1011"	=>	H"0AA";
+			B"1010"	=>	H"078";
+			B"1001"	=>	H"055";
+			B"1000"	=>	H"03C";
+			B"0111"	=>	H"02A";
+			B"0110"	=>	H"01E";
+			B"0101"	=>	H"015";
+			B"0100"	=>	H"00F";
+			B"0011"	=>	H"00A";
+			B"0010"	=>	H"007";
+			B"0001"	=>	H"005";
+			B"0000"	=>	H"000";
+	END TABLE;
+
+	TABLE
+        iodata[3..0]=>	n_Pegel[];
+			B"1111"	=>	H"2AA";		-- Umsetzung in logarithmische Werte in ca. 3dB Schritten
+			B"1110"	=>	H"1E2";		-- für Kanäle
+			B"1101"	=>	H"155";
+			B"1100"	=>	H"0F1";
+			B"1011"	=>	H"0AA";
+			B"1010"	=>	H"078";
+			B"1001"	=>	H"055";
+			B"1000"	=>	H"03C";
+			B"0111"	=>	H"02A";
+			B"0110"	=>	H"01E";
+			B"0101"	=>	H"015";
+			B"0100"	=>	H"00F";
+			B"0011"	=>	H"00A";
+			B"0010"	=>	H"007";
+			B"0001"	=>	H"005";
+			B"0000"	=>	H"000";
+	END TABLE;
+
+--Audioshifter
+--	links[]=(H"8000"+(chanA[10],chanA[],B"0000")+(chanB[10],chanB[10],chanB[],B"000"));
+--	rechts[]= (H"8000"+(chanC[10],chanC[],B"0000")+(chanB[10],chanB[10],chanB[],B"000"));
+	rechts[]=(H"8000"+(chanA[],B"00000")+(chanB[10],chanB[],B"0000"));
+	links[]= (H"8000"+(chanC[],B"00000")+(chanB[10],chanB[],B"0000"));
+
+	shiftcnt[].clk=shiftclk;
+	shiftcnt[]=shiftcnt[]-1;
+	shift[].clk=shiftclk;
+	bck= NOT shiftcnt[0];
+	lrclk = shiftcnt[7];				
+	iauda=shift[15];
+	shift[].ena=shiftcnt[6..1]<=15 AND NOT shiftcnt[0];
+	IF shiftcnt[6..1] == 0 then		
+    	IF lrclk THEN						
+			shift[]	= (rechts[]);			
+		ELSE
+			shift[] = (links[]);				
+	   	END IF;
+	ELSE
+		shift[15..1] = shift[14..0];
+	END IF;
+END;
+

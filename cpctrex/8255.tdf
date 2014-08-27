@@ -1,0 +1,109 @@
+-- C-One reconfigurable computer
+-- http://c64upgra.de/c-one/
+-- Subdesign C-One 
+--
+-- Copyright (c) 2005 Tobias Gubener
+--
+-- All rights reserved
+--
+-- Redistribution and use in source and synthezised forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+--
+-- Redistributions of source code must retain the above copyright notice,
+-- this list of conditions and the following disclaimer.
+--
+-- Redistributions in synthesized form must reproduce the above copyright
+-- notice, this list of conditions and the following disclaimer in the
+-- documentation and/or other materials provided with the distribution.
+--
+-- Neither the name of the author nor the names of other contributors may
+-- be used to endorse or promote products derived from this software without
+-- specific prior written permission.
+--
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+-- THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-- PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE
+-- LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+-- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+-- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+-- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+-- CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+-- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+-- POSSIBILITY OF SUCH DAMAGE.
+--
+
+SUBDESIGN 8255 
+(
+	adr[15..8]		:INPUT;
+	data[7..0]		:INPUT;
+	iowr			:INPUT;
+	iord			:INPUT;
+	ioclk			:INPUT;
+	
+	PBI[7..0]		:INPUT=VCC;
+	PAI[7..0]		:INPUT=VCC;		--Keyboarddaten
+	PAO[7..0]		:OUTPUT;		--sounddaten
+	PCO[7..0]		:OUTPUT;		--tastatur und steuerung
+	DO[7..0]		:BIDIR;
+	--PCO[7] = bdir, PCO[6] = BC 
+)
+VARIABLE
+	PAO[7..0], PAdir	:DFFE;
+	PCO_d[7..0]			:DFFE;	
+	t_data[7..0]		:TRI;
+BEGIN
+DEFAULTS
+	PAO[].ena=GND;
+	PAdir.ena=GND;
+	PCO_d[].ena=GND;
+	t_data[].oe=GND;
+END DEFAULTS;
+	PCO[7..4]=PCO_d[7..4];
+	PCO[3..0]=PCO_d[3..0];
+	(PAO[], PAdir, PCO_d[]).clk =ioclk;
+	DO[]=t_data[].out;
+	IF adr[15..8]==H"F4" AND NOT IOWR THEN
+		PAO[].ena=VCC;	
+		PAO[]=data[];
+	END IF;
+	IF adr[15..8]==H"F4" AND NOT IORD THEN	--Keyboarddaten
+		t_data[].oe=VCC;
+		IF PAdir THEN
+			t_data[].in=PAI[];
+		ELSE
+			t_data[].in=PAO[];
+		END IF;	
+	END IF;
+	IF adr[15..8]==H"F5" AND NOT IORD THEN
+		t_data[].oe=VCC;
+--		t_data[].in=(B"1",PBI[6],B"1",PBI[4],B"111",PBI[0]);
+		t_data[].in=(B"111",PBI[4],B"111", PBI[0]);
+	END IF;
+	IF adr[15..8]==H"F6" AND NOT IOWR THEN
+		PCO_d[].ena=VCC;
+		PCO_d[]=data[];
+	END IF;
+	IF adr[15..8]==H"F6" AND NOT IORD THEN
+		t_data[].oe=VCC;
+		t_data[].in=PCO_d[];		--internes Register lesen
+	END IF;
+	IF adr[15..8]==H"F7" AND NOT IOWR AND NOT data[7] THEN
+		PCO_d[7..0]=data[0];
+		PCO_d[0].ena=(data[3..1]==B"000");
+		PCO_d[1].ena=(data[3..1]==B"001");
+		PCO_d[2].ena=(data[3..1]==B"010");
+		PCO_d[3].ena=(data[3..1]==B"011");
+		PCO_d[4].ena=(data[3..1]==B"100");
+		PCO_d[5].ena=(data[3..1]==B"101");
+		PCO_d[6].ena=(data[3..1]==B"110");
+		PCO_d[7].ena=(data[3..1]==B"111");
+	END IF;
+	IF adr[15..8]==H"F7" AND NOT IOWR AND data[7] THEN
+		(PAO[], PCO_d[]).ena=VCC;
+		PAdir=data[4];
+		PAdir.ena=VCC;
+		PAO[]=0;
+		PCO_d[]=0;
+	END IF;
+END;

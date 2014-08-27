@@ -1,0 +1,267 @@
+/*
+WARNING: Do NOT edit the input and output ports in this file in a text
+editor if you plan to continue editing the block that represents it in
+the Block Editor! File corruption is VERY likely to occur.
+*/
+/*
+Copyright (C) 1991-2005 Altera Corporation
+Your use of Altera Corporation's design tools, logic functions 
+and other software and tools, and its AMPP partner logic 
+functions, and any output files any of the foregoing 
+(including device programming or simulation files), and any 
+associated documentation or information are expressly subject 
+to the terms and conditions of the Altera Program License 
+Subscription Agreement, Altera MegaCore Function License 
+Agreement, or other applicable license agreement, including, 
+without limitation, that your use is for the sole purpose of 
+programming logic devices manufactured by Altera and sold by 
+Altera or its authorized distributors.  Please refer to the 
+applicable agreement for further details.
+*/
+(header "symbol" (version "1.1"))
+(symbol
+	(rect 16 16 216 496)
+	(text "a1k100" (rect 5 0 46 14)(font "Arial" (font_size 8)))
+	(text "inst" (rect 8 464 25 476)(font "Arial" ))
+	(port
+		(pt 0 32)
+		(input)
+		(text "sysclk" (rect 0 0 36 14)(font "Arial" (font_size 8)))
+		(text "sysclk" (rect 21 27 57 41)(font "Arial" (font_size 8)))
+		(line (pt 0 32)(pt 16 32)(line_width 1))
+	)
+	(port
+		(pt 0 48)
+		(input)
+		(text "shiftclk" (rect 0 0 40 14)(font "Arial" (font_size 8)))
+		(text "shiftclk" (rect 21 43 61 57)(font "Arial" (font_size 8)))
+		(line (pt 0 48)(pt 16 48)(line_width 1))
+	)
+	(port
+		(pt 0 64)
+		(input)
+		(text "key[7..0]" (rect 0 0 48 14)(font "Arial" (font_size 8)))
+		(text "key[7..0]" (rect 21 59 69 73)(font "Arial" (font_size 8)))
+		(line (pt 0 64)(pt 16 64)(line_width 3))
+	)
+	(port
+		(pt 0 80)
+		(input)
+		(text "sw[3..0]" (rect 0 0 47 14)(font "Arial" (font_size 8)))
+		(text "sw[3..0]" (rect 21 75 68 89)(font "Arial" (font_size 8)))
+		(line (pt 0 80)(pt 16 80)(line_width 3))
+	)
+	(port
+		(pt 0 96)
+		(input)
+		(text "kb_clk" (rect 0 0 35 14)(font "Arial" (font_size 8)))
+		(text "kb_clk" (rect 21 91 56 105)(font "Arial" (font_size 8)))
+		(line (pt 0 96)(pt 16 96)(line_width 1))
+	)
+	(port
+		(pt 0 112)
+		(input)
+		(text "kb_data" (rect 0 0 44 14)(font "Arial" (font_size 8)))
+		(text "kb_data" (rect 21 107 65 121)(font "Arial" (font_size 8)))
+		(line (pt 0 112)(pt 16 112)(line_width 1))
+	)
+	(port
+		(pt 0 128)
+		(input)
+		(text "fl_data[7..0]" (rect 0 0 67 14)(font "Arial" (font_size 8)))
+		(text "fl_data[7..0]" (rect 21 123 88 137)(font "Arial" (font_size 8)))
+		(line (pt 0 128)(pt 16 128)(line_width 3))
+	)
+	(port
+		(pt 200 32)
+		(output)
+		(text "video[15..0]" (rect 0 0 66 14)(font "Arial" (font_size 8)))
+		(text "video[15..0]" (rect 113 27 179 41)(font "Arial" (font_size 8)))
+		(line (pt 200 32)(pt 184 32)(line_width 3))
+	)
+	(port
+		(pt 200 48)
+		(output)
+		(text "vsync" (rect 0 0 35 14)(font "Arial" (font_size 8)))
+		(text "vsync" (rect 144 43 179 57)(font "Arial" (font_size 8)))
+		(line (pt 200 48)(pt 184 48)(line_width 1))
+	)
+	(port
+		(pt 200 64)
+		(output)
+		(text "hsync" (rect 0 0 35 14)(font "Arial" (font_size 8)))
+		(text "hsync" (rect 144 59 179 73)(font "Arial" (font_size 8)))
+		(line (pt 200 64)(pt 184 64)(line_width 1))
+	)
+	(port
+		(pt 200 80)
+		(output)
+		(text "iauda" (rect 0 0 30 14)(font "Arial" (font_size 8)))
+		(text "iauda" (rect 149 75 179 89)(font "Arial" (font_size 8)))
+		(line (pt 200 80)(pt 184 80)(line_width 1))
+	)
+	(port
+		(pt 200 96)
+		(output)
+		(text "lrclk" (rect 0 0 22 14)(font "Arial" (font_size 8)))
+		(text "lrclk" (rect 157 91 179 105)(font "Arial" (font_size 8)))
+		(line (pt 200 96)(pt 184 96)(line_width 1))
+	)
+	(port
+		(pt 200 112)
+		(output)
+		(text "bck" (rect 0 0 20 14)(font "Arial" (font_size 8)))
+		(text "bck" (rect 159 107 179 121)(font "Arial" (font_size 8)))
+		(line (pt 200 112)(pt 184 112)(line_width 1))
+	)
+	(port
+		(pt 200 144)
+		(output)
+		(text "sd_addr[12..0]" (rect 0 0 82 14)(font "Arial" (font_size 8)))
+		(text "sd_addr[12..0]" (rect 97 139 179 153)(font "Arial" (font_size 8)))
+		(line (pt 200 144)(pt 184 144)(line_width 3))
+	)
+	(port
+		(pt 200 160)
+		(output)
+		(text "dqm[3..0]" (rect 0 0 51 14)(font "Arial" (font_size 8)))
+		(text "dqm[3..0]" (rect 128 155 179 169)(font "Arial" (font_size 8)))
+		(line (pt 200 160)(pt 184 160)(line_width 3))
+	)
+	(port
+		(pt 200 176)
+		(output)
+		(text "sd_cs[3..0]" (rect 0 0 63 14)(font "Arial" (font_size 8)))
+		(text "sd_cs[3..0]" (rect 116 171 179 185)(font "Arial" (font_size 8)))
+		(line (pt 200 176)(pt 184 176)(line_width 3))
+	)
+	(port
+		(pt 200 192)
+		(output)
+		(text "sd_ba[1..0]" (rect 0 0 63 14)(font "Arial" (font_size 8)))
+		(text "sd_ba[1..0]" (rect 116 187 179 201)(font "Arial" (font_size 8)))
+		(line (pt 200 192)(pt 184 192)(line_width 3))
+	)
+	(port
+		(pt 200 208)
+		(output)
+		(text "sd_we" (rect 0 0 40 14)(font "Arial" (font_size 8)))
+		(text "sd_we" (rect 139 203 179 217)(font "Arial" (font_size 8)))
+		(line (pt 200 208)(pt 184 208)(line_width 1))
+	)
+	(port
+		(pt 200 224)
+		(output)
+		(text "sd_ras" (rect 0 0 40 14)(font "Arial" (font_size 8)))
+		(text "sd_ras" (rect 139 219 179 233)(font "Arial" (font_size 8)))
+		(line (pt 200 224)(pt 184 224)(line_width 1))
+	)
+	(port
+		(pt 200 240)
+		(output)
+		(text "sd_cas" (rect 0 0 42 14)(font "Arial" (font_size 8)))
+		(text "sd_cas" (rect 137 235 179 249)(font "Arial" (font_size 8)))
+		(line (pt 200 240)(pt 184 240)(line_width 1))
+	)
+	(port
+		(pt 200 256)
+		(output)
+		(text "fl_addr[20..0]" (rect 0 0 75 14)(font "Arial" (font_size 8)))
+		(text "fl_addr[20..0]" (rect 104 251 179 265)(font "Arial" (font_size 8)))
+		(line (pt 200 256)(pt 184 256)(line_width 3))
+	)
+	(port
+		(pt 200 272)
+		(output)
+		(text "fl_ce" (rect 0 0 28 14)(font "Arial" (font_size 8)))
+		(text "fl_ce" (rect 151 267 179 281)(font "Arial" (font_size 8)))
+		(line (pt 200 272)(pt 184 272)(line_width 1))
+	)
+	(port
+		(pt 200 304)
+		(output)
+		(text "idea[3..0]" (rect 0 0 51 14)(font "Arial" (font_size 8)))
+		(text "idea[3..0]" (rect 128 299 179 313)(font "Arial" (font_size 8)))
+		(line (pt 200 304)(pt 184 304)(line_width 3))
+	)
+	(port
+		(pt 200 320)
+		(output)
+		(text "ide1cs" (rect 0 0 37 14)(font "Arial" (font_size 8)))
+		(text "ide1cs" (rect 142 315 179 329)(font "Arial" (font_size 8)))
+		(line (pt 200 320)(pt 184 320)(line_width 1))
+	)
+	(port
+		(pt 200 336)
+		(output)
+		(text "ide2cs" (rect 0 0 37 14)(font "Arial" (font_size 8)))
+		(text "ide2cs" (rect 142 331 179 345)(font "Arial" (font_size 8)))
+		(line (pt 200 336)(pt 184 336)(line_width 1))
+	)
+	(port
+		(pt 200 352)
+		(output)
+		(text "io_wr" (rect 0 0 33 14)(font "Arial" (font_size 8)))
+		(text "io_wr" (rect 146 347 179 361)(font "Arial" (font_size 8)))
+		(line (pt 200 352)(pt 184 352)(line_width 1))
+	)
+	(port
+		(pt 200 368)
+		(output)
+		(text "io_rd" (rect 0 0 28 14)(font "Arial" (font_size 8)))
+		(text "io_rd" (rect 151 363 179 377)(font "Arial" (font_size 8)))
+		(line (pt 200 368)(pt 184 368)(line_width 1))
+	)
+	(port
+		(pt 200 384)
+		(output)
+		(text "wrena" (rect 0 0 37 14)(font "Arial" (font_size 8)))
+		(text "wrena" (rect 142 379 179 393)(font "Arial" (font_size 8)))
+		(line (pt 200 384)(pt 184 384)(line_width 1))
+	)
+	(port
+		(pt 200 432)
+		(output)
+		(text "LED[7..0]" (rect 0 0 50 14)(font "Arial" (font_size 8)))
+		(text "LED[7..0]" (rect 129 427 179 441)(font "Arial" (font_size 8)))
+		(line (pt 200 432)(pt 184 432)(line_width 3))
+	)
+	(port
+		(pt 200 448)
+		(output)
+		(text "TxD" (rect 0 0 22 14)(font "Arial" (font_size 8)))
+		(text "TxD" (rect 157 443 179 457)(font "Arial" (font_size 8)))
+		(line (pt 200 448)(pt 184 448)(line_width 1))
+	)
+	(port
+		(pt 200 128)
+		(bidir)
+		(text "sdata[15..0]" (rect 0 0 67 14)(font "Arial" (font_size 8)))
+		(text "sdata[15..0]" (rect 112 123 179 137)(font "Arial" (font_size 8)))
+		(line (pt 200 128)(pt 184 128)(line_width 3))
+	)
+	(port
+		(pt 200 288)
+		(bidir)
+		(text "idedb[15..0]" (rect 0 0 66 14)(font "Arial" (font_size 8)))
+		(text "idedb[15..0]" (rect 113 283 179 297)(font "Arial" (font_size 8)))
+		(line (pt 200 288)(pt 184 288)(line_width 3))
+	)
+	(port
+		(pt 200 400)
+		(bidir)
+		(text "mouse_clk" (rect 0 0 60 14)(font "Arial" (font_size 8)))
+		(text "mouse_clk" (rect 119 395 179 409)(font "Arial" (font_size 8)))
+		(line (pt 200 400)(pt 184 400)(line_width 1))
+	)
+	(port
+		(pt 200 416)
+		(bidir)
+		(text "mouse_data" (rect 0 0 69 14)(font "Arial" (font_size 8)))
+		(text "mouse_data" (rect 110 411 179 425)(font "Arial" (font_size 8)))
+		(line (pt 200 416)(pt 184 416)(line_width 1))
+	)
+	(drawing
+		(rectangle (rect 16 16 184 464)(line_width 1))
+	)
+)

@@ -1,0 +1,351 @@
+-- Copyright (c) 2005-2006 Tobias Gubener
+-- Subdesign CPC T-REX by TobiFlex
+-- All rights reserved
+--
+-- Redistribution and use in source and synthezised forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+--
+-- Redistributions of source code must retain the above copyright notice,
+-- this list of conditions and the following disclaimer.
+--
+-- Redistributions in synthesized form must reproduce the above copyright
+-- notice, this list of conditions and the following disclaimer in the
+-- documentation and/or other materials provided with the distribution.
+--
+-- Neither the name of the author nor the names of other contributors may
+-- be used to endorse or promote products derived from this software without
+-- specific prior written permission.
+--
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+-- THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-- PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE
+-- LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+-- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+-- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+-- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+-- CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+-- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+-- POSSIBILITY OF SUCH DAMAGE.
+--
+ 
+SUBDESIGN sdram
+	(
+	sdata[15..0]		: BIDIR;
+	sdaddr[12..0]		: OUTPUT;
+	dqm[3..0]			: OUTPUT;
+	sd_cs[3..0]			: OUTPUT;
+	ba[1..0]			: OUTPUT;
+	sd_we				: OUTPUT;
+	sd_ras				: OUTPUT;
+	sd_cas				: OUTPUT;
+
+	datain[7..0]		: INPUT;
+	sysclk				: INPUT;
+	resetas				: INPUT;
+	merq				: INPUT;
+	wrin				: INPUT;
+	rd					: INPUT;
+	Addrin[22..0]		: INPUT;
+	refresh				: INPUT;
+	oe					: INPUT;
+	vack				: INPUT;		--LH=>nächstes Byte
+	speed				: INPUT;		--H=Clone L=Turbo;
+--	iorq				: INPUT;
+	vaddr[22..0]		: INPUT;
+	raddr[22..0]		: INPUT;
+	rdatain[7..0]		: INPUT;
+	rwr					: INPUT;
+	rrefresh			: INPUT;
+	faster				: INPUT;
+	slower				: INPUT;
+	iowait				: INPUT;
+	dataout[7..0]		: OUTPUT;
+	video[7..0]			: OUTPUT;
+	cpuclk				: OUTPUT;
+	cpuena				: OUTPUT;
+	crt1MHz				: OUTPUT;
+	wait				: OUTPUT;
+	rclk				: OUTPUT;
+	rena				: OUTPUT;
+	rdata[7..0]			: OUTPUT;
+	rioclk				: OUTPUT;
+	reset				: OUTPUT;
+--Flashcopy
+	fl_data[7..0]		: INPUT;
+	fl_addr[20..0]		: OUTPUT;
+	fl_ce				: OUTPUT;	
+	rzclk				: OUTPUT;
+	)
+ 
+VARIABLE
+Addr[22..0]				:NODE;
+initstate[3..0]			:DFFE;
+slow[3..0]				:DFFE;
+nextclk					:DFFE;
+cpuena, cpuenacl		:DFFE;
+cpucycle				:NODE;
+isd_ras					:NODE;
+isd_cas					:NODE;
+isd_we 					:NODE;
+state[2..0]				:DFF;
+cpuclk, rclk, rioclk	:DFF;
+isdaddr[12..0]			:NODE;
+
+dataoutb[15..0]			:LATCH;
+--dataoutb[15..0]			:DFFE;
+sd_we					:DFF;
+sd_ras					:DFF;
+sd_cas					:DFF;
+ksd_we					:DFF;
+ksd_ras					:DFF;
+ksd_cas					:DFF;
+t_sdata[15..0]			:TRI;
+t_data[7..0]			:TRI;
+casaddr					:DFFE;
+casaddrd, rasaddr		:DFF;
+st10,initstop			:DFF;
+	sdaddr[12..0]		:DFFE;
+	dqm[3..0]			:DFFE;
+	sd_cs[3..0]			:DFFE;
+	video[7..0]			:NODE;
+crtcnt[1..0]			:DFFE;
+waitcnt[1..0]			:DFF;
+venain, venaclr			:DFF;
+vena					:DFFE;
+--wait					:DFF;
+--addrsel, 
+wr				:NODE;
+--rdata[7..0]				:DFFE;
+--rdata[7..0]				:LATCH;
+rfsh					:NODE;
+addrsel					:DFFE;
+rena					:DFFE;
+addrseli				:NODE;
+reset					:DFFE;
+resetcnt[5..0]			:DFFE;
+resetin					:DFF;
+--Flashcopy
+fladdrcnt[21..0]		:DFFE;
+rzclk					:DFFE;
+--dataout[7..0]			:DFFE;
+slowerd					:DFFE;
+vidcache[15..0]			:DFFE;
+begin
+DEFAULTS
+	t_sdata[].oe=GND;
+	isd_ras = VCC;
+	isd_cas = VCC;
+	isd_we = VCC;
+	isdaddr[]=VCC;
+	casaddr=GND;
+	rasaddr=GND;
+	nextclk.ena=GND;
+	crtcnt[].ena=GND;
+	venaclr=GND;
+--	video[].ena=GND;
+	rena=GND;
+	vena=GND;
+	rfsh=VCC;
+	cpuena=GND;
+	cpuenacl=GND;
+	addrseli=GND;
+	slow[].ena=GND;
+--	rdata[].ena=GND;
+	cpucycle=GND;
+	vidcache[].ena=GND;
+END DEFAULTS;
+--	ba[] = b"00";
+ 	ba[] = addr[22..21];
+	(slow[], nextclk, crtcnt[]).clk=sysclk;
+	crt1MHz=crtcnt[1];
+	crtcnt[]=crtcnt[]+1;
+	
+	(waitcnt[]).clk=cpuclk;
+	waitcnt[]=waitcnt[]+1;
+	wait=iowait;
+	
+	(ksd_we, ksd_ras, ksd_cas, state[], initstate[], casaddr, rasaddr, st10, casaddrd, initstop, rzclk).clk =  sysclk;
+	(sdaddr[], dqm[], sd_cs[], vidcache[]).clk= sysclk;
+	sdaddr[].ena=state[0];
+	(dqm[], sd_cs[]).ena=state[]==1;
+	dataoutb[].ena=sysclk;
+	t_data[].oe=oe AND not (merq or rd);
+	
+	venain.clk=vack;
+	venain=VCC;
+	venain.clrn=NOT vena;
+
+	rzclk.ena=iowait;
+	(cpuena, cpuenacl, vena, rena, addrsel, reset, rioclk, cpuclk, rclk, slowerd).clk=sysclk;
+	(cpuena, cpuenacl, vena, rena, addrsel, reset, slow[]).ena=state[]==0;
+	rzclk = state[]==0 or state[]<3 or rasaddr or NOT cpuenacl;-- or NOT wait;
+	cpuclk = state[]==0 or state[]<2 or rasaddr or NOT cpuenacl;
+	rclk = state[]==0 or state[]<2 or rasaddr OR NOT rena OR NOT reset;
+	rioclk = state[]==0 or state[]<2;
+	reset=NOT rasaddr AND resetcnt[]==B"111111";
+	resetcnt[].clk=rioclk;
+	resetcnt[]=resetcnt[]+1;
+	resetcnt[].ena=resetcnt[]!=B"111111";
+	(reset,resetcnt[]).clrn=resetas;
+	
+	IF slow[2..0]==B"101" THEN
+		slow[]=slow[]+3;
+		IF slow[3] THEN
+			crtcnt[].ena=VCC;
+		END IF;
+	ELSE
+		slow[]=slow[]+1;
+	END IF;	
+	nextclk=reset AND (NOT speed OR (nextclk AND NOT cpuena) OR slow[]==0);	
+	nextclk.ena=VCC;
+	
+	slowerd=slower AND NOT slowerd;
+
+	IF slow[0] THEN
+		IF nextclk THEN
+			cpuena=VCC;
+			slowerd.ena=(state[]==0);
+		END IF;
+		IF ((NOT slower OR slowerd) AND nextclk) OR faster THEN
+			cpuenacl=VCC;
+			cpucycle=VCC;
+		END IF;
+	END IF;	
+	
+	IF NOT cpucycle THEN 
+		vena=venain AND NOT vaddr[0];
+		rena=NOT venain OR vaddr[0];
+	END IF;
+	
+	addrsel=addrseli;
+	
+	IF NOT fladdrcnt[21] AND fladdrcnt[0] THEN
+		addr[]=(B"000",fladdrcnt[20..1]);
+		t_sdata[] = (fl_data[],fl_data[]);
+		wr=GND;
+	ELSIF rena THEN	--RISC
+		addr[]=raddr[];
+		wr=rwr;-- OR NOT reset;
+		t_sdata[] = (rdatain[], rdatain[]); 
+		rfsh= NOT rrefresh;
+	ELSIF vena  THEN
+		addr[]=vaddr[];
+		wr=VCC;
+		venaclr=VCC;
+--		video[].ena=state[]==7;
+		vidcache[].ena=(state[]==7);-- AND NOT vaddr[0];
+		rfsh=refresh;
+	ELSE
+		addr[]=addrin[];
+		wr=(wrin OR merq) OR NOT reset;
+		t_sdata[] = (datain[], datain[]); 
+	END IF;					
+		
+	vidcache[]=dataoutb[];
+	IF vaddr[0] THEN
+--		video[]=dataoutb[15..8];
+		video[]=vidcache[15..8];
+	ELSE
+		video[]=vidcache[7..0];
+	END IF;	
+
+	IF raddr[0] THEN
+		rdata[]=dataoutb[15..8];
+	ELSE
+		rdata[]=dataoutb[7..0];
+	END IF;	
+
+	IF addrin[0] THEN
+		dataout[]=dataoutb[15..8];
+--		dataout[]=sdata[15..8];
+	ELSE
+		dataout[]=dataoutb[7..0];
+--		dataout[]=sdata[7..0];
+	END IF;	
+--	dataout[].ena=state[]==6;
+	dataoutb[]=sdata[];
+	st10=state[]==6;
+
+	sdata[] = t_sdata[];
+	t_sdata[].oe = casaddrd;
+	casaddrd=casaddr;-- AND NOT wr;
+	
+--	(sd_we, sd_ras, sd_cas).prn=reset;
+	(sd_we, sd_ras, sd_cas).clk= sysclk;
+	sd_ras = isd_ras or NOT state[0];
+	sd_cas = isd_cas or NOT state[0];
+	sd_we = isd_we or NOT state[0];
+	
+	casaddr.ena=state[0];
+	initstop=initstate[]!=B"1111";
+--	(initstate[], state[]).clrn=reset;
+--	initstate[].ena=state[]==B"111" and rasaddr;
+	initstate[].ena=state[]==B"111" and initstop;
+	state[]=state[]+1;
+	initstate[] = initstate[]+1;
+	
+	IF casaddr THEN
+		sdaddr[] = (GND, GND, VCC, B"00", addr[8..1]);--auto precharge
+	ELSE	
+		IF initstop THEN
+			sdaddr[]=isdaddr[];
+		ELSE
+			sdaddr[] = (B"0", addr[20..9]);
+		END IF;	
+	END IF;	
+	
+				case (initstate[],state[2..1]) is
+					when 8 => --PRECHARGE ALL BANKS
+						sd_cs[] = B"0000";
+						isd_ras = GND;
+						isd_we = GND;
+					when 12,16,20,24,28,32,36,40,44,48 => --AUTOREFRESH
+						sd_cs[] = B"0000"; 
+						isd_ras = GND;
+						isd_cas = GND;
+					when 52 => --LOAD MODE REGISTER
+--						isdaddr[] = B"0001000110000"; --BURST=1 LATENCY=3
+						isdaddr[] = B"0000000100000"; --BURST=1 LATENCY=2
+						sd_cs[] = B"0000";
+						isd_ras = GND;
+						isd_cas = GND;
+						isd_we = GND;
+					when 60 => --ACTIVE
+						dqm[] = (VCC, VCC, not addr[0] AND NOT wr, addr[0] AND NOT wr);
+						casaddr=VCC;
+						isd_ras = GND;
+						IF rfsh THEN		--Low aktiv
+							sd_cs[] = (VCC, VCC, VCC, GND); --ACTIVE
+							isd_cas = VCC; 
+						ELSE
+							sd_cs[] = B"0000";
+							isd_cas = GND;--AUTOREFRESH
+						END IF;
+					when 61 => --READ or Write
+						IF rfsh THEN	--no refresh => read/write
+							isd_cas = GND;
+							isd_we = wr;
+						END IF;
+					when others =>		--NOP
+						isd_we = VCC;
+				end case; 
+
+--Flashcopy
+	resetin.clk=sysclk;
+	resetin=resetas;
+	rasaddr=NOT fladdrcnt[21] OR initstop;
+	fladdrcnt[].ena=NOT initstop AND NOT fladdrcnt[21];
+
+--	fladdrcnt[21].prn=NOT initstop;
+	fladdrcnt[21].clrn=resetin;
+	fladdrcnt[20].prn=NOT fladdrcnt[21];	--beim Einschalten wird der gesamte Flash kopiert
+											--bei reset nur ab 40000
+
+	fladdrcnt[19..0].clrn=resetin;
+	fladdrcnt[].clk=rioclk;
+	fladdrcnt[]=fladdrcnt[]+1;
+	fl_addr[]=(GND, fladdrcnt[20..1]);
+	fl_ce=fladdrcnt[21];
+
+end;

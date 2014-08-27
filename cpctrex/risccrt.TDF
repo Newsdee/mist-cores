@@ -1,0 +1,163 @@
+-- Copyright (c) 2005-2006 Tobias Gubener
+-- Subdesign CPC T-REX by TobiFlex
+-- All rights reserved
+--
+-- Redistribution and use in source and synthezised forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+--
+-- Redistributions of source code must retain the above copyright notice,
+-- this list of conditions and the following disclaimer.
+--
+-- Redistributions in synthesized form must reproduce the above copyright
+-- notice, this list of conditions and the following disclaimer in the
+-- documentation and/or other materials provided with the distribution.
+--
+-- Neither the name of the author nor the names of other contributors may
+-- be used to endorse or promote products derived from this software without
+-- specific prior written permission.
+--
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+-- THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-- PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE
+-- LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+-- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+-- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+-- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+-- CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+-- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+-- POSSIBILITY OF SUCH DAMAGE.
+--
+
+SUBDESIGN risccrt
+(
+	16MHz				:INPUT;
+	VSYNC				:OUTPUT;
+	HSYNC				:OUTPUT;
+	vadr[13..0]			:OUTPUT;
+	blackb, border		:OUTPUT;
+)
+
+VARIABLE
+	count[9..0]				:DFF;
+	stat[2..0]				:DFFE;
+	vcount[8..0]			:DFF;
+	vstat[1..0]				:DFFE;
+	countnode[9..0]			:NODE;
+	vcountnode[8..0]		:NODE;
+	videonode[5..0]			:NODE;
+	hsync					:DFFE;
+	res, vsync				:NODE;
+	sstart[10..0]			:DFFE;
+	scount[10..0]			:DFF;
+	ra[2..0]				:DFFE;
+	vakt					:NODE;
+	blackb, border			:DFF;
+BEGIN
+DEFAULTS
+	stat[].ena=GND;
+	vstat[].ena=GND;
+	ra[].ena=GND;
+	sstart[].ena=GND;
+	vakt=GND;
+	hsync=GND;
+	hsync.ena=GND;
+	vsync=GND;
+	videonode[3..0]=GND;--Border
+	videonode[4]=VCC;
+	videonode[5]=GND;
+END DEFAULTS;
+----------------------------------------------------------------------------
+--VADR
+----------------------------------------------------------------------------
+vadr[10..0]=scount[10..0];
+vadr[13..11]=ra[2..0];
+
+----------------------------------------------------------------------------
+--HSYNC
+----------------------------------------------------------------------------
+	(count[], stat[], hsync).clk=16MHz;
+	border=videonode[4];
+	blackb=videonode[5];
+	(blackb, border).clk=count2;
+	CASE stat[] IS
+		WHEN 0=> countnode[]=79;--74;
+				 videonode[]=B"100000";		--schwarzschulter
+				 hsync=VCC;					--HSYNC
+				 stat[]=1;
+		WHEN 1=> countnode[]=111;--92;
+				stat[]=2;
+		WHEN 2=> countnode[]=63;--95;
+				 videonode[]=B"100000";		--schwarzschulter
+				stat[]=3;
+		WHEN 3=> countnode[]=639;			--639 BORDER
+
+				stat[]=4;
+		WHEN 4=> countnode[]=95;			--95
+				 IF vakt THEN
+				 	videonode[5..4]=B"00";	--AKTIV
+				END IF;	
+				stat[]=5;
+		WHEN 5=> countnode[]=31;
+				stat[]=0;
+		END CASE;
+----------------------------------------------------------------------------
+--ROW & COL
+----------------------------------------------------------------------------
+
+(scount[],  sstart[], ra[]).clk=count2;			--2MHz
+
+ra[]=ra[]+1;
+IF res THEN 
+	sstart[]=scount[];
+ELSE
+	sstart[]=0;--(hadr[1..0],ladr[],B"0");
+END IF;
+
+IF stat[] == 3 AND count[] != 0 THEN
+	scount[]=sstart[];
+ELSE
+	scount[]=scount[]+1;
+END IF;
+
+IF (count[]==0) THEN
+
+	IF stat[] == 4 THEN
+		sstart[].ena=(ra[]==7 ) OR NOT res;
+		ra[].ena=VCC;
+	END IF;
+	stat[].ena=VCC;
+	hsync.ena=VCC;
+	count[]=countnode[];
+ELSE
+	count[]=count[]-1;
+END IF;
+----------------------------------------------------------------------------
+--VSYNC
+----------------------------------------------------------------------------
+
+	res=vstat[]!=1;
+	(vcount[], vstat[]).clk=hsync;
+	vstat[]=vstat[]+1;
+	ra[].clrn=res; 
+
+	CASE vstat[] IS
+		WHEN 0=> vcountnode[]=65;			--43
+				 vsync=VCC;					--V-Sync
+		WHEN 1=> vcountnode[]=199;			--BORDER
+
+		WHEN 2=> vcountnode[]=37;			--(43)
+				 vakt=VCC; 					--AKTIV
+		WHEN 3=> vcountnode[]=7;			--BORDER (23)
+
+	END CASE;
+
+
+IF (vcount[]==0) THEN
+	vstat[].ena=VCC;
+	vcount[]=vcountnode[];
+ELSE
+	vcount[]=vcount[]-1;
+END IF;
+END;
+

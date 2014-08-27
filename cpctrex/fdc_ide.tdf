@@ -1,0 +1,472 @@
+-- Copyright (c) 2005-2006 Tobias Gubener
+-- Subdesign CPC T-REX by TobiFlex
+-- All rights reserved
+--
+-- Redistribution and use in source and synthezised forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+--
+-- Redistributions of source code must retain the above copyright notice,
+-- this list of conditions and the following disclaimer.
+--
+-- Redistributions in synthesized form must reproduce the above copyright
+-- notice, this list of conditions and the following disclaimer in the
+-- documentation and/or other materials provided with the distribution.
+--
+-- Neither the name of the author nor the names of other contributors may
+-- be used to endorse or promote products derived from this software without
+-- specific prior written permission.
+--
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+-- THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-- PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE
+-- LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+-- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+-- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+-- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+-- CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+-- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+-- POSSIBILITY OF SUCH DAMAGE.
+--
+ 
+
+SUBDESIGN fdc_ide
+(
+	z80addr[15..0]		:INPUT;
+	z80iord,z80iowr		:INPUT;
+--	z80iorq				:INPUT;
+	Z80inData[7..0]		:INPUT;		--Z80  
+	clk					:INPUT;
+	intWR				:INPUT;		--internes IO_WR RISC
+	intRD				:INPUT;		--internes IO_RD RISC
+	IO_Adr[15..0]		:INPUT;		--RISC adrbus
+	sWR					:INPUT;--acs[0]		--Signalbildung für externe IOs
+	sCE					:INPUT;--sca[1]		--sWR=0 sCE=0 ==> IO_WR=1 IO_RD=1 MDB=TRI
+											--sWR=1 sCE=0 ==> IO_WR=1 IO_RD=1 MDB=Dout
+											--sWR=0 sCE=1 ==> IO_WR=1 IO_RD=0 MDB=Din
+											--sWR=1 sCE=1 ==> IO_WR=0 IO_RD=1 MDB=Dout
+	reset				:INPUT;
+	txd_busy			:INPUT;
+	PBI[7..0]			:INPUT;
+	z80outData[7..0]	:OUTPUT;
+	ridata[7..0]		:BIDIR;
+--	FDCstat[7..0]		:OUTPUT;
+	
+	Idedb[15..0]		:BIDIR;		--
+	Idea[3..0]			:OUTPUT;	--IDE Adr
+	Ide1cs				:OUTPUT;
+	Ide2cs				:OUTPUT;
+	IO_WR				:OUTPUT;	--extern IO_WR
+	IO_RD				:OUTPUT;	--extern IO_RD
+	wait				:OUTPUT;
+	wrena				:OUTPUT;
+	rs232clk			:OUTPUT;
+	rs232[7..0]			:OUTPUT;
+	rs232stb			:OUTPUT;
+	speed				:INPUT;
+	riscena				:INPUT;
+)
+
+VARIABLE
+	t_data[7..0]		:TRI;
+	t_ridata[7..0]		:TRI;
+	
+	ide1cso, ide2cso	:DFFE;
+	ide1csz, ide2csz	:DFFE;
+	IdeDatawr[15..0]	:DFFE;
+	IdeHdatard[15..8]	:DFFE;
+	d_Idea[3..0]		:DFFE;
+
+	t_idedb[15..0]		:TRI;
+--	t_mdb[7..0]			:TRI;
+	lh					:DFFE;
+	drzed				:NODE;
+	wrstart				:DFFE;
+	rdstart, rdstop		:DFFE;
+	wrshift[5..0]		:DFF;
+	rdshift				:DFF;
+	rdpass				:DFFE;
+--	t_Idea[2..0]		:TRI;
+	iordd				:DFF;
+--	datafile			:NODE;
+	datafiled			:DFFE;
+	aoutena				:DFFE;
+	bidewr, biderd		:NODE;
+	bidewrd, biderdd	:DFF;
+	bide				:NODE;
+	bided				:DFF;
+	rdclr				:DFF;
+	idecsclr			:DFF;
+
+	
+	FDCstat[7..0], FDCdir	:DFFE;
+	FDCdata[7..0]		:DFFE;
+	fdc					:NODE;
+	bfdcwr, bfdcrd		:NODE;
+	waitcnt[5..0]		:DFF;
+	waitinit			:NODE;
+	silversurfer		:DFFE;
+--	rs232[7..0]			:DFFE;
+	rs232stb			:DFF;
+	rs232cnt[6..0]		:DFF;
+BEGIN
+DEFAULTS
+	t_ridata[].oe=GND;
+	t_data[].oe=GND;
+	
+	IdeDatawr[].ena=GND;
+	IdeHdatard[].ena=GND;
+	Ide1cso.ena=GND;
+	Ide2cso.ena=GND;
+	Ide1csz.ena=GND;
+	Ide2csz.ena=GND;
+	d_Idea[].ena=GND;
+	rdclr=GND;
+
+
+	lh=GND;				--Taskfile	
+	lh.ena=GND;
+	wrstart.ena=GND;
+	rdstart.ena=GND;
+	rdstop.ena=GND;
+	rdpass.ena=GND;
+	rdstart.clrn=VCC;
+	rdshift.clrn=VCC;
+	rdstop.clrn=VCC;
+	rdpass.clrn=VCC;
+	wrshift[4..0].clrn=VCC;
+	aoutena.ena=GND;
+	datafiled.ena=GND;
+	silversurfer.ena=GND;
+	rs232stb=VCC;
+--	rs232[].ena=GND;
+	waitinit=GND;
+	
+	FDCstat[].ena=GND;
+	FDCdir.ena=GND;
+	FDCdata[].ena=GND;
+END DEFAULTS;
+	
+
+ 
+-------------------------------------------------------------------
+--Bus mux
+-------------------------------------------------------------------	
+	z80outData[]=t_data[].out;		
+	ridata[]=t_ridata[];
+
+	t_idedb[].oe=wrstart OR sWR;					--IDEdatenbus = Dout
+	Idedb[]=t_idedb[].out;
+	t_idedb[].in=IdeDatawr[];					
+	wrena=wrstart OR sWR;
+
+-------------------------------------------------------------------
+--SymbiFace Z80 Side
+-------------------------------------------------------------------	
+	(IdeHdatard[], iordd, aoutena, bidewrd, biderdd, datafiled).clk=clk;
+	(waitcnt[],rdclr).clk=clk;
+	
+ 	(bided,rdclr,idecsclr).clk=clk;
+
+
+	(Ide1cso, Ide2cso, IdeDatawr[], d_Idea[]).clk=clk;	
+	idea[]=d_idea[];
+
+	bide=	z80addr[15..4]==B"111111010000"			--Primär IDE
+--		OR	z80addr[15..4]==B"111111010100"			--Sekundär IDE
+		AND  (NOT z80iowr OR NOT z80iord);
+	bidewr=bide AND NOT z80iowr;
+	biderd=bide AND NOT z80iord;
+	
+	wait=NOT waitinit AND waitcnt[]==b"000000" ;
+	waitcnt[]=(waitcnt[4..0], waitinit);
+	
+	(bidewrd, biderdd, bided)=(bidewr, biderd, bide);
+-------------------------------------------------------------------
+-------------------------------------------------------------------	
+	 
+	IdeHdatard[]=Idedb[15..8];
+	IF biderd THEN		--IDE-Lesezugriff vom 1K100
+		t_data[].oe=VCC;
+		IF z80addr[2..0]==B"000" AND lh THEN	--Datenfile   
+			t_data[]=IdeHdatard[];				--Hdata von IDE lesen
+		ELSE									--Taskfile	
+			t_data[]=Idedb[7..0];				--Daten von IDE
+--			t_data[]=IdeDatawr[7..0];				--Daten von IDE
+			IdeHdatard[].ena=VCC;				--Hdata von IDE speichern
+		END IF;
+	ELSE
+		IF bfdcrd THEN	--FDCstatus
+			t_data[].oe=VCC;
+			IF z80addr[0] THEN
+				t_data[].in=FDCdata[];
+			ELSE
+				t_data[].in=(FDCstat[7..4], B"0000");
+			END IF;
+		ELSE
+			IF z80addr[]==H"FEFE" AND NOT z80iord THEN
+				t_data[].oe=VCC;
+				t_data[].in=(B"1100001",NOT speed);			--T-REX Kennung
+			END IF;	
+		END IF;	
+	END IF;	
+
+ 
+	Ide1cs=NOT ((Ide1cso AND (sCE OR sWR OR NOT iordd)) OR (Ide1csz AND (wrstart OR rdstart)));
+	Ide2cs=NOT ((Ide2cso AND (sCE OR sWR OR NOT iordd)) OR (Ide2csz AND (wrstart OR rdstart)));
+
+	iordd=NOT sCE OR sWR;			--Dout
+	IO_WR=(NOT sCE OR NOT sWR) AND NOT wrshift[0];
+	IO_RD=(NOT sCE OR sWR OR iordd) AND NOT rdshift;
+
+
+	idecsclr=rdstop OR wrshift[5];
+	(Ide1cso, Ide2cso).clrn=NOT idecsclr;
+	(Ide1csz, Ide2csz).clrn=NOT idecsclr;
+--------------------------------------------------
+--DR.ZED
+--------------------------------------------------	
+	drzed=IO_Adr[15..8]==H"FD" AND (IO_Adr[7..4]==H"4" OR IO_Adr[7..4]==H"0") AND riscena;
+	(Ide1csz, Ide2csz, lh, rdstart, rdshift, rdstop, rdpass, wrstart, wrshift[]).clk=clk;
+
+--Schreiben
+	IF bidewr AND NOT bidewrd THEN					--Anfang Schreiben
+		rdclr=VCC;
+		lh.ena=VCC;
+		IF z80addr[2..0]==B"000" THEN				--datafile
+			IF lh THEN								--Datenfile 
+				wrstart.ena=VCC;  
+				IdeDatawr[15..8].ena=VCC;			--Hdata
+			ELSE									--Taskfile	
+				IdeDatawr[7..0].ena=VCC;			--Ldata
+				lh=VCC;								--HDatafile	
+			END IF;
+		ELSE
+			IdeDatawr[7..0].ena=VCC;			--Ldata
+			wrstart.ena=VCC;	
+		END IF;	
+	END IF;
+	
+--Lesen
+	IF biderd AND NOT biderdd THEN					--Anfang Lesen
+		IF z80addr[2..0]==B"000" THEN
+			IF NOT lh THEN		--Datenfile   
+				rdstart.ena=VCC;
+				waitinit=VCC;
+			END IF;
+		ELSE
+			rdstart.ena=VCC;	
+			waitinit=VCC;
+		END IF;
+	END IF;
+--	IF biderd AND NOT lh THEN
+--		IdeHdatard[].ena=VCC;				--Hdata von IDE speichern
+--	END IF;
+	IF NOT biderd AND biderdd THEN					--Ende Lesen
+		rdstop.ena=VCC;
+		lh.ena=VCC;
+		IF d_Idea[2..0]==B"000" AND NOT lh THEN		--Datenfile   
+			lh=VCC;
+		END IF;	
+	END IF;	
+		
+	IF bide THEN		--IDE-Zugriff vom Z80
+		IF NOT bided THEN			--Anfang IDE-Zugriff
+			d_idea[].ena=VCC;
+			(ide1csz, ide2csz).ena=VCC;
+			(ide1cso, ide2cso).ena=VCC;
+		END IF;
+		d_idea[]=z80addr[3..0];
+		(ide1csz, ide2csz)=(NOT  z80addr[6],z80addr[6]);
+		(ide1cso, ide2cso)=GND;
+		IdeDatawr[7..0]=z80inData[];
+		IdeDatawr[15..8]=z80inData[];
+	ELSE 
+		IdeDatawr[7..0]=riData[];
+		IdeDatawr[15..8]=riData[];
+		IF drzed THEN	--IDE-Zugriff vom shadow Z80
+			IF NOT( intRD OR rdpass) OR NOT intWR THEN
+				(ide1csz, ide2csz).ena=VCC;
+				(ide1cso, ide2cso).ena=VCC;
+				d_Idea[].ena=VCC;
+			END IF;
+			d_Idea[]=IO_Adr[3..0];
+			(ide1csz, ide2csz)=(NOT IO_Adr[6], IO_Adr[6]);
+			(ide1cso, ide2cso)=GND;
+		--Schreiben
+			IF  NOT intWR THEN
+				rdclr=VCC;
+				lh.ena=VCC;
+				IF IO_Adr[2..0]==B"000" THEN			--datafile
+					IF lh THEN								--Datenfile 
+						wrstart.ena=VCC;  
+						IdeDatawr[15..8].ena=VCC;			--Hdata
+					ELSE									--Taskfile	
+						IdeDatawr[7..0].ena=VCC;			--Ldata
+						lh=VCC;								--HDatafile	
+					END IF;
+				ELSE
+					IdeDatawr[7..0].ena=VCC;			--Ldata
+					wrstart.ena=VCC;	
+				END IF;	
+			END IF;			
+		--Lesen
+			IF NOT intRD THEN
+				rdpass.ena=VCC;							--erst 2. Lesen schaltet
+				rdstop.ena=rdstart;
+				lh.ena=rdpass;
+				t_ridata[].oe=VCC;
+				IF IO_Adr[2..0]==B"000" THEN 
+					IF lh THEN		--Datenfile   
+						t_ridata[].in=IdeHdatard[];			--Hdata von IDE lesen
+					ELSE									--Taskfile	
+						t_ridata[].in=Idedb[7..0];			--Daten von IDE
+						IdeHdatard[].ena=VCC;				--Hdata von IDE speichern
+						lh=VCC;
+						rdstart.ena=NOT rdpass;
+					END IF;
+				ELSE	
+					t_ridata[].in=Idedb[7..0];			--Daten von IDE
+					rdstart.ena=NOT rdpass;
+				END IF;
+			END IF;
+		ELSE			--IDE-Zugriff vom RISC
+			d_Idea[]=(B"1",riData[2..0]);
+			(ide1cso, ide2cso)=(NOT riData[5], NOT riData[4]);
+			(ide1csz, ide2csz)=GND;
+		END IF;
+	END IF;	
+	
+	
+--schreiben	
+	wrshift[]=(wrshift[4..0], wrstart AND NOT wrshift[5]);		
+	wrstart=NOT wrshift[5];
+	wrstart.ena=wrshift[5];
+	wrshift[4..0].clrn=NOT wrshift[5];
+	(rdstart, rdshift, rdstop, rdpass).clrn=NOT rdclr;
+
+--lesen	
+ 	rdshift=rdstart AND NOT rdstop;
+	rdshift.clrn=NOT rdstop;
+	rdstop=rdshift;
+	rdstop.ena=rdstop; 
+	rdstart=NOT rdstop;
+	rdstart.ena=rdstop;
+	rdpass=NOT rdpass;
+
+-----------------------------------------------------------------
+--FDC Z80 Side
+-----------------------------------------------------------------			
+	(FDCstat[], FDCdir, FDCdata[]).clk=clk;
+	(FDCstat[], FDCdir).clrn=reset;
+	
+	fdc=z80addr[15..1]==B"111110110111111";		--FB7E/F
+	bfdcwr=fdc AND NOT z80iowr;
+	bfdcrd=fdc AND NOT z80iord;
+	
+	IF NOT fdc AND NOT z80addr[10] THEN
+		t_data[].oe=NOT z80iord;
+		t_data[]=VCC;
+	END IF;
+	
+	IF bfdcwr THEN
+		FDCdata[]=z80inData[];
+		FDCdata[].ena=VCC;
+	END IF;
+	
+	
+	IF (bfdcwr) OR (bfdcrd AND z80addr[0]) THEN
+		FDCstat[7]=GND;
+		FDCstat[6..4]=FDCstat[2..0];	
+		FDCstat[7..4].ena=VCC;
+		FDCdir=NOT bfdcwr; 
+		FDCdir.ena=VCC;
+	END IF;
+
+-------------------------------------------------------------------
+--Read vsync
+-------------------------------------------------------------------	
+
+ 	IF IO_Adr[15..8]==H"F5" AND NOT intRD THEN 
+		t_ridata[].oe=VCC;
+		t_ridata[].in=PBI[];
+	END IF;		
+
+-------------------------------------------------------------------
+--SymbiFace RISC Side
+-------------------------------------------------------------------	
+	IF IO_Adr[15..8]==H"FC" THEN 
+
+		IF IO_Adr[7..0]==H"00" AND NOT intWR THEN	--OUT FC00   
+			IdeDatawr[7..0].ena=VCC;				--Ldata
+		END IF;		
+		IF IO_Adr[7..0]==H"01" AND NOT intWR THEN	--OUT FC01
+			IdeDatawr[15..8].ena=VCC;				--Hdata
+		END IF;		
+		IF IO_Adr[7..0]==H"02" AND NOT intWR THEN	--OUT FC02
+--			d_a[].ena=VCC;							--Subadrbur
+			d_Idea[].ena=VCC;	
+		END IF;		
+		IF IO_Adr[7..0]==H"03" AND NOT intWR THEN	--OUT FC03
+			ide1cso.ena=VCC;
+			ide2cso.ena=VCC;
+			(ide1csz, ide2csz).ena=VCC;
+			silversurfer=ridata[3..0]==H"2";
+			silversurfer.ena=VCC;
+		END IF;		
+
+
+		IF IO_Adr[7..0]==H"00" AND NOT intRD THEN	--IN FC00
+			IF ide1cs AND ide2cs THEN
+				t_ridata[].in=txd_Busy;					--Daten von mdb
+			ELSE
+				t_ridata[].in=Idedb[7..0];			--Daten von IDE
+			END IF;
+			t_ridata[].oe=VCC;
+			IdeHdatard[].ena=VCC;					--Hdata von IDE speichern
+		END IF;		
+		IF IO_Adr[7..0]==H"01" AND NOT intRD THEN	--IN FC01
+			t_ridata[].oe=VCC;
+			t_ridata[].in=IdeHdatard[];				--Hdata von IDE lesen
+		END IF;	
+-----------------------------------------------------------------
+--FDC RISC Side
+-----------------------------------------------------------------			
+		IF IO_Adr[7..0]==H"04" AND NOT intWR THEN	--OUT FC04
+			IF ridata[7] THEN
+				FDCStat[6..4]=ridata[6..4];
+				FDCstat[6..4].ena=VCC;
+			END IF;	
+			FDCstat[7]=VCC;
+			FDCstat[7].ena=VCC;
+			FDCstat[3..0].ena=VCC;
+			FDCstat[3..0]=(GND, ridata[2..0]);	
+		END IF;	
+			
+		IF IO_Adr[7..0]==H"05" AND NOT intWR THEN	--OUT FC05
+			FDCdata[]=ridata[];
+			FDCdata[].ena=VCC;						--FDCdata
+		END IF;		
+		IF IO_Adr[7..0]==H"04" AND NOT intRD THEN	--IN FC04
+			t_ridata[7..6]=(FDCstat[7], FDCdir);	--FDCstat lesen
+			t_ridata[].oe=VCC;		
+		END IF;		
+		IF IO_Adr[7..0]==H"05" AND NOT intRD THEN	--IN FC05
+			t_ridata[]=FDCdata[];	--FDCdata lesen
+			t_ridata[].oe=VCC;		
+		END IF;		
+	END IF;
+-------------------------------------------------------------------
+--RS232
+-------------------------------------------------------------------	
+	(silversurfer, rs232stb,  rs232cnt[]).clk=clk;
+	rs232stb=NOT (silversurfer AND d_Idea[2..0]==0 AND sWR AND sCE);
+--	rs232[].ena=rs232stb;rs232[],
+	rs232[]=IdeDatawr[7..0];
+	rs232clk=rs232cnt[6];
+	IF rs232cnt[]==0 THEN
+		rs232cnt[]=77;
+	ELSE
+		rs232cnt[]=rs232cnt[]-1;
+	END IF;		
+END;
