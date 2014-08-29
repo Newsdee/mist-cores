@@ -102,9 +102,9 @@ architecture rtl of disk_ii is
   signal phase : unsigned(7 downto 0);  -- 0 - 139
 
   -- Storage for one track worth of data in "nibblized" form
-  type track_ram is array(0 to 6655) of unsigned(7 downto 0);
+  --type track_ram is array(0 to 6655) of unsigned(7 downto 0);
   -- Double-ported RAM for holding a track
-  signal track_memory : track_ram;
+  --signal track_memory : track_ram;
   signal ram_do : unsigned(7 downto 0);
 
   -- Lower bit indicates whether disk data is "valid" or not
