@@ -347,15 +347,10 @@ begin
   
   data_io_inst: data_io
     port map(SPI_SCK, SPI_SS2, SPI_DI, downl, size, CLK_14M, io_we, io_addr, io_do);
-    
---  sd_addr <= io_ram_addr when downl = '1' else '0'&std_logic_vector(TRACK_RAM_ADDR) when TRACK_RAM_OE = '1' else "100"&std_logic_vector(a_ram);
---  sd_di <= io_ram_d when downl = '1' else std_logic_vector(D);
---  sd_oe <= '0' when downl = '1' else not sd_we; --TRACK_RAM_OE;
---  sd_we <= '1' when io_ram_we = '1' else ram_we;
 
-  sd_addr <= io_ram_addr when io_ram_we ='1' else disk_ram_addr when TRACK_RAM_OE = '1' else mem_ram_addr;
+  sd_addr <= io_ram_addr when io_ram_we ='1' else disk_ram_addr when TRACK_RAM_OE = '1' and PRE_PHASE_ZERO='1' else mem_ram_addr;
   sd_di <= io_ram_d when io_ram_we ='1' else std_logic_vector(D);
-  sd_oe <= '0' when io_ram_we ='1' else disk_ram_oe when TRACK_RAM_OE = '1' else not mem_ram_we;
+  sd_oe <= '0' when io_ram_we ='1' else disk_ram_oe when TRACK_RAM_OE = '1' and PRE_PHASE_ZERO='1' else not mem_ram_we;
   sd_we <= '1' when io_ram_we ='1' else mem_ram_we;
     
   process (CLK_14M)
@@ -366,15 +361,15 @@ begin
         io_ram_addr <= io_addr(18 downto 0);
         io_ram_d <= io_do;
       else
-        if TRACK_RAM_OE = '1' then
+        if TRACK_RAM_OE = '1' and PRE_PHASE_ZERO='1' then
           disk_ram_oe <= '1';
           disk_ram_we <= '0';
-          disk_ram_addr <= '0'&std_logic_vector(TRACK_RAM_ADDR);
+          disk_ram_addr <= '0' & std_logic_vector(TRACK_RAM_ADDR);
           TRACK_RAM_DI <= unsigned(sd_do);
         else
           disk_ram_oe <= '0';
           mem_ram_we <= ram_we;
-          mem_ram_addr <= "100"&std_logic_vector(a_ram);
+          mem_ram_addr <= "100" & std_logic_vector(a_ram);
           DO <= sd_do;
         end if;
         io_ram_we <= '0';
