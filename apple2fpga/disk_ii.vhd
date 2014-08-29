@@ -94,7 +94,7 @@ architecture rtl of disk_ii is
   signal drive2_select : std_logic;
   signal q6, q7 : std_logic;
 
-  signal rom_dout : unsigned(7 downto 0);
+  signal rom_dout : std_logic_vector(7 downto 0);
 
   -- Current phase of the head.  This is in half-steps to assign
   -- a unique position to the case, say, when both phase 0 and phase 1 are
@@ -277,15 +277,24 @@ begin
     end if;
   end process;
 
-  rom : entity work.disk_ii_rom port map (
-    addr => A(7 downto 0),
-    clk  => CLK_14M,
-    dout => rom_dout);
+    
+  disk_rom_inst : entity work.sprom
+    generic map
+    (
+      init_file	=> "slot6.mif",
+      widthad_a	=> 8
+    )
+    port map
+    (
+      clock			=> CLK_14M,
+      address		=> std_logic_vector(A(7 downto 0)),
+      q					=> rom_dout
+    );
 
   read_disk <= '1' when DEVICE_SELECT = '1' and A(3 downto 0) = x"C" else
                '0';  -- C08C
 
-  D_OUT <= rom_dout when IO_SELECT = '1' else
+  D_OUT <= unsigned(rom_dout) when IO_SELECT = '1' else
            ram_do when read_disk = '1' and track_byte_addr(0) = '0' else
            (others => '0');
 

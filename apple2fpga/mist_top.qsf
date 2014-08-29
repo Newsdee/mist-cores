@@ -314,6 +314,7 @@ set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_COLOR 2147039 -section_id Top
 
+set_global_assignment -name VHDL_FILE sprom.vhd
 set_global_assignment -name VHDL_FILE spram.vhd
 set_global_assignment -name VERILOG_FILE sdram.v
 set_global_assignment -name VHDL_FILE keyboard.vhd
@@ -323,11 +324,9 @@ set_global_assignment -name VERILOG_FILE data_io.v
 set_global_assignment -name VHDL_FILE timing_generator.vhd
 set_global_assignment -name VHDL_FILE character_rom.vhd
 set_global_assignment -name VHDL_FILE video_generator.vhd
-set_global_assignment -name VHDL_FILE main_roms.vhd
 set_global_assignment -name VHDL_FILE cpu6502.vhd
 set_global_assignment -name VHDL_FILE apple2.vhd
 set_global_assignment -name VHDL_FILE disk_ii.vhd
-set_global_assignment -name VHDL_FILE disk_ii_rom.vhd
 set_global_assignment -name VHDL_FILE vga_controller.vhd
 set_global_assignment -name VHDL_FILE PS2_Ctrl.vhd
 set_global_assignment -name QIP_FILE mist_clk.qip

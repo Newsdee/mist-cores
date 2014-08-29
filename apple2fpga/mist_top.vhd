@@ -203,6 +203,13 @@ architecture datapath of mist_top is
   signal io_ram_we : std_logic;
   signal io_ram_d : std_logic_vector(7 downto 0);
   signal io_ram_addr : std_logic_vector(18 downto 0);
+  signal disk_ram_we : std_logic;
+  signal disk_ram_oe : std_logic;
+  signal disk_ram_d : std_logic_vector(7 downto 0);
+  signal disk_ram_addr : std_logic_vector(18 downto 0);
+  signal mem_ram_we : std_logic;
+  signal mem_ram_do : std_logic_vector(7 downto 0);
+  signal mem_ram_addr : std_logic_vector(18 downto 0);
   
   signal switches   : std_logic_vector(1 downto 0);
   signal buttons    : std_logic_vector(1 downto 0);
@@ -341,10 +348,15 @@ begin
   data_io_inst: data_io
     port map(SPI_SCK, SPI_SS2, SPI_DI, downl, size, CLK_14M, io_we, io_addr, io_do);
     
-  sd_addr <= io_ram_addr when downl = '1' else std_logic_vector(resize(TRACK_RAM_ADDR + 65535, sd_addr'length));
-  sd_di <= io_ram_d;
-  sd_oe <= '0' when downl = '1' else TRACK_RAM_OE;
-  sd_we <= '1' when io_ram_we = '1' else '0';
+--  sd_addr <= io_ram_addr when downl = '1' else '0'&std_logic_vector(TRACK_RAM_ADDR) when TRACK_RAM_OE = '1' else "100"&std_logic_vector(a_ram);
+--  sd_di <= io_ram_d when downl = '1' else std_logic_vector(D);
+--  sd_oe <= '0' when downl = '1' else not sd_we; --TRACK_RAM_OE;
+--  sd_we <= '1' when io_ram_we = '1' else ram_we;
+
+  sd_addr <= io_ram_addr when io_ram_we ='1' else disk_ram_addr when TRACK_RAM_OE = '1' else mem_ram_addr;
+  sd_di <= io_ram_d when io_ram_we ='1' else std_logic_vector(D);
+  sd_oe <= '0' when io_ram_we ='1' else disk_ram_oe when TRACK_RAM_OE = '1' else not mem_ram_we;
+  sd_we <= '1' when io_ram_we ='1' else mem_ram_we;
     
   process (CLK_14M)
   begin
@@ -354,24 +366,21 @@ begin
         io_ram_addr <= io_addr(18 downto 0);
         io_ram_d <= io_do;
       else
+        if TRACK_RAM_OE = '1' then
+          disk_ram_oe <= '1';
+          disk_ram_we <= '0';
+          disk_ram_addr <= '0'&std_logic_vector(TRACK_RAM_ADDR);
+          TRACK_RAM_DI <= unsigned(sd_do);
+        else
+          disk_ram_oe <= '0';
+          mem_ram_we <= ram_we;
+          mem_ram_addr <= "100"&std_logic_vector(a_ram);
+          DO <= sd_do;
+        end if;
         io_ram_we <= '0';
       end if;
     end if;
   end process;
-  
-  ram_inst : entity work.spram
-    generic map
-    (
-      widthad_a	=> 16
-    )
-    port map
-    (
-      clock	=> CLK_14M,
-      address	=> std_logic_vector(a_ram),
-      wren	=> ram_we,
-      data	=> std_logic_vector(D),
-      q	=> DO
-    );
   
   core : entity work.apple2 port map (
     CLK_14M        => CLK_14M,
@@ -444,7 +453,7 @@ begin
     D1_ACTIVE      => D1_ACTIVE,
     D2_ACTIVE      => D2_ACTIVE,
     ram_write_addr => TRACK_RAM_ADDR,
-    ram_di         => unsigned(sd_do),
+    ram_di         => TRACK_RAM_DI,
     ram_oe         => TRACK_RAM_OE
     );
     

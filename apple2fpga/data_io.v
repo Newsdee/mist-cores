@@ -38,7 +38,7 @@ module data_io (
 
 assign d = data;
 
-parameter START_ADDR = 25'hFFFF;
+parameter START_ADDR = 25'h0;
 
 assign size = addr;
 

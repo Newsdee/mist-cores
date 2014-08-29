@@ -73,8 +73,8 @@ architecture rtl of apple2 is
   signal we : std_logic;
 
   -- Main ROM signals
-  signal rom_out : unsigned(7 downto 0);
-  signal rom_addr : unsigned(13 downto 0);
+  signal rom_out : std_logic_vector(7 downto 0);
+  signal rom_addr : std_logic_vector(13 downto 0);
 
   -- Address decoder signals
   signal RAM_SELECT : std_logic := '1';
@@ -111,7 +111,7 @@ begin
   ADDR <= A;
   
   -- Address decoding
-  rom_addr <= (A(13) and A(12)) & (not A(12)) & A(11 downto 0);
+  rom_addr <= std_logic_vector((A(13) and A(12)) & (not A(12)) & A(11 downto 0));
 
   address_decoder: process (A)
   begin
@@ -202,7 +202,7 @@ begin
           K when KEYBOARD_SELECT = '1' else  -- Keyboard
           GAMEPORT(TO_INTEGER(A(2 downto 0))) & "0000000"  -- Gameport
              when GAMEPORT_SELECT = '1' else
-          rom_out when ROM_SELECT = '1' else  -- ROMs
+          unsigned(rom_out) when ROM_SELECT = '1' else  -- ROMs
           PD;                           -- Peripherals
 
   LD194 <= LD194_I;
@@ -278,9 +278,18 @@ begin
 
   -- Original Apple had asynchronous ROMs.  We use a synchronous ROM
   -- that needs its address earlier, hence the odd clock.
-  roms : entity work.main_roms port map (
-    addr => rom_addr,
-    clk  => CLK_14M,
-    dout => rom_out);
+    
+  boot_rom_inst : entity work.sprom
+    generic map
+    (
+      init_file	=> "apple_II.mif",
+      widthad_a	=> 14
+    )
+    port map
+    (
+      clock			=> CLK_14M,
+      address		=> rom_addr,
+      q					=> rom_out
+    );
     
 end rtl;
