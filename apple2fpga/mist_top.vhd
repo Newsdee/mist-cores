@@ -356,6 +356,11 @@ begin
       else
         io_ram_we <= '0';
       end if;
+      if downl = '1' then
+        force_reset <= '1';
+      else
+        force_reset <= '0';
+      end if;
     end if;
   end process;
   

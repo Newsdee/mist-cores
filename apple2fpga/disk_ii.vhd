@@ -114,8 +114,10 @@ architecture rtl of disk_ii is
   -- not yet ready.
   signal track_byte_addr : unsigned(14 downto 0);
   signal read_disk : std_logic;         -- When C08C accessed
+  signal ram_addr : unsigned(17 downto 0);
   
   signal requested_track : unsigned(5 downto 0) := (others => '0');
+  signal stored_track : unsigned(5 downto 0) := (others => '1');
 
 begin
 
@@ -240,18 +242,32 @@ begin
 
   requested_track <= phase(7 downto 2);
   TRACK <= phase(7 downto 2);
+  ram_write_addr <= ram_addr;
 
   -- Dual-ported RAM holding the contents of the track
   track_storage : process (CLK_14M)
+    variable cnt : integer := 0;
   begin
     if rising_edge(CLK_14M) then
-      ram_write_addr <= resize((requested_track * X"1A00") + track_byte_addr(14 downto 1), ram_write_addr'length);
-      ram_do <= ram_di;
-      ram_oe <= read_disk and not track_byte_addr(0);
+      if reset = '1' then
+        cnt := 0;
+        stored_track <= (others => '1');
+      elsif requested_track /= stored_track then
+        ram_addr <= resize((requested_track * X"1A00") + cnt, ram_addr'length);
+        track_memory(to_integer(ram_addr)) <= ram_di;
+        ram_oe <= '1';
+        if cnt = 6655 then
+          stored_track <= requested_track;
+          cnt := 0;
+          ram_oe <= '0';
+        else
+          cnt := cnt + 1;
+        end if;
+      end if;
 --      if ram_we = '1' then
 --        track_memory(to_integer(ram_write_addr)) <= ram_di;
 --      end if;
---      ram_do <= track_memory(to_integer(track_byte_addr(14 downto 1)));
+      ram_do <= track_memory(to_integer(track_byte_addr(14 downto 1)));
     end if;
   end process;
 
