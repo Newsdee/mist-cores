@@ -40,7 +40,10 @@ entity apple2 is
     DEVICE_SELECT  : out std_logic_vector(7 downto 0);
     pcDebugOut     : out unsigned(15 downto 0);
     opcodeDebugOut : out unsigned(7 downto 0);
-    speaker        : out std_logic              -- One-bit speaker output
+    speaker        : out std_logic;              -- One-bit speaker output
+    rc_read_en     : in std_logic;               -- ramcard read enable
+    rc_d_o         : in unsigned(7 downto 0);     -- ramcard data out
+    rom_access     : out std_logic
     );
 end apple2;
 
@@ -89,6 +92,8 @@ architecture rtl of apple2 is
   signal speaker_sig : std_logic := '0';        
 
   signal DL : unsigned(7 downto 0);     -- Latched RAM data
+  
+  signal rom_ram_out : unsigned(7 downto 0);
 
 begin
 
@@ -112,6 +117,8 @@ begin
   
   -- Address decoding
   rom_addr <= (A(13) and A(12)) & (not A(12)) & A(11 downto 0);
+  rom_ram_out <= rc_d_o when rc_read_en = '1' else rom_out;
+  rom_access <= ROM_SELECT;
 
   address_decoder: process (A)
   begin
@@ -202,7 +209,7 @@ begin
           K when KEYBOARD_SELECT = '1' else  -- Keyboard
           GAMEPORT(TO_INTEGER(A(2 downto 0))) & "0000000"  -- Gameport
              when GAMEPORT_SELECT = '1' else
-          rom_out when ROM_SELECT = '1' else  -- ROMs
+          rom_ram_out when ROM_SELECT = '1' else  -- ROMs and ramcard
           PD;                           -- Peripherals
 
   LD194 <= LD194_I;

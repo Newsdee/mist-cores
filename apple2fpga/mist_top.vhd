@@ -197,7 +197,7 @@ architecture datapath of mist_top is
   signal vsync : std_logic;
   signal sd_we : std_logic;
   signal sd_oe : std_logic;
-  signal sd_addr : std_logic_vector(17 downto 0);
+  signal sd_addr : std_logic_vector(18 downto 0);
   signal sd_di : std_logic_vector(7 downto 0);
   signal sd_do : std_logic_vector(7 downto 0);
   signal io_we : std_logic;
@@ -225,6 +225,19 @@ architecture datapath of mist_top is
   signal joyx       : std_logic;
   signal joyy       : std_logic;
   signal pdl_strobe : std_logic;
+  
+  signal io_access  : std_logic;
+  signal rom_select : std_logic;
+  
+  -- ramcard
+  signal rc_bank1       : std_logic := '0';
+  signal rc_read_en     : std_logic := '0';
+  signal rc_write_en    : std_logic := '0';
+  signal rc_pre_wr_en   : std_logic := '0';
+  signal rc_addr        : std_logic_vector(18 downto 0);
+  signal Dxxx           : std_logic := '0';
+  signal rc_access      : std_logic := '0';
+ 
 
 begin
 
@@ -338,7 +351,7 @@ begin
               clkref => CLK_14M,
               init => not pll_locked,
               din => sd_di,
-              addr => "0000000" & sd_addr,
+              addr => "000000" & sd_addr,
               we => sd_we,
               oe => sd_oe,
               dout => sd_do
@@ -347,10 +360,12 @@ begin
   data_io_inst: data_io
     port map(SPI_SCK, SPI_SS2, SPI_DI, downl, size, CLK_14M, io_we, io_addr, io_do);
     
-  sd_addr <= io_ram_addr when downl = '1' else std_logic_vector(TRACK_RAM_ADDR);
-  sd_di <= io_ram_d;
-  sd_oe <= '0' when downl = '1' else TRACK_RAM_OE;
-  sd_we <= '1' when io_ram_we = '1' else '0';
+  sd_addr <= '0' & io_ram_addr when downl = '1' else rc_addr when rc_access = '1' and io_access = '0' else '0' & std_logic_vector(TRACK_RAM_ADDR); -- when io_access = '1' else rc_addr;
+  sd_di <= io_ram_d when downl = '1' else std_logic_vector(D) when rc_access = '1' and io_access = '0' else "00000000"; -- when io_access = '1' else std_logic_vector(D);
+  sd_oe <= '0' when downl = '1' else rc_read_en when rc_access = '1' and io_access = '0' else TRACK_RAM_OE; -- when io_access = '1' else rc_read_en;
+  sd_we <= '1' when io_ram_we = '1' else rc_write_en when rc_access = '1' and io_access = '0' else '0'; -- when io_access = '1' else rc_write_en;
+  
+  io_access <= DEVICE_SELECT(6);
     
   process (CLK_14M)
   begin
@@ -365,6 +380,7 @@ begin
     end if;
   end process;
   
+  -- main ram  
   ram_inst : entity work.spram
     generic map
     (
@@ -378,6 +394,31 @@ begin
       data	=> std_logic_vector(D),
       q	=> DO
     );
+    
+  -- ramcard
+  rc_access <= rc_read_en or (rc_write_en and DEVICE_SELECT(0));
+  Dxxx <= '1' when a_ram(15 downto 12) = x"D" else '0';
+  rc_addr <= "100" & std_logic_vector(a_ram(15 downto 13) & (a_ram(12) and not(rc_bank1 and Dxxx)) & a_ram(11 downto 0));
+  
+  process(CLK_2M)
+  begin
+    if rising_edge(CLK_2M) then
+      if reset = '1' then
+        rc_pre_wr_en <= '0';
+        rc_write_en    <= '1';
+        rc_read_en  <= '0';
+        rc_bank1  <= '0';
+      elsif PRE_PHASE_ZERO='1' then -- and DEVICE_SELECT(0) = '1' then
+        if a_ram(15 downto 4) = x"C08" then
+          rc_bank1 <= a_ram(3);
+          rc_pre_wr_en <= a_ram(0) and not ram_we;
+          rc_write_en <= a_ram(0) and rc_pre_wr_en and not ram_we;
+          rc_read_en <= not (a_ram(0) xor a_ram(1));
+        end if;
+      end if;
+    end if;
+  end process;
+  -- ramcard end
   
   core : entity work.apple2 port map (
     CLK_14M        => CLK_14M,
@@ -404,7 +445,10 @@ begin
     IO_SELECT      => IO_SELECT,
     DEVICE_SELECT  => DEVICE_SELECT,
     pcDebugOut     => cpu_pc,
-    speaker        => audio
+    speaker        => audio,
+    rc_read_en     => rc_read_en,
+    rc_d_o         => unsigned(sd_do),
+    rom_access     => rom_select
     );
     
   AUDIO_L <= audio;
@@ -495,73 +539,5 @@ begin
       hs_out => VGA_HS,
       vs_out => VGA_VS
     );
-
---  SRAM_DQ(7 downto 0) <= D when ram_we = '1' else (others => 'Z');
---  SRAM_ADDR(17) <= '0';
---  SRAM_ADDR(16) <= '0';
---  SRAM_UB_N <= '1';
---  SRAM_LB_N <= '0';
---  SRAM_CE_N <= '0';
---  SRAM_WE_N <= not ram_we;
---  SRAM_OE_N <= ram_we;
---
---  LEDR(17) <= D1_ACTIVE;
---  LEDR(16) <= D2_ACTIVE;
---  LEDR(15) <= TRACK_RAM_WE;
---
---  LEDG(8 downto 1) <= (others => '0');
---  LEDR(14 downto 4) <= (others => '0');
---
---  UART_TXD <= '0';
---  FL_ADDR <= (others => '0');
---  FL_WE_N <= '1';
---  FL_RST_N <= '0';
---  FL_OE_N <= '1';
---  FL_CE_N <= '1';
---  OTG_ADDR <= (others => '0');
---  OTG_CS_N <= '1';
---  OTG_RD_N <= '1';
---  OTG_RD_N <= '1';
---  OTG_WR_N <= '1';
---  OTG_RST_N <= '1';
---  OTG_FSPEED <= '1';
---  OTG_LSPEED <= '1';
---  OTG_DACK0_N <= '1';
---  OTG_DACK1_N <= '1';
---
---  LCD_ON <= '0';
---  LCD_BLON <= '0';
---  LCD_RW <= '1';
---  LCD_EN <= '0';
---  LCD_RS <= '0';
---
---  TDO <= '0';
---
---  I2C_SCLK <= '0';
---
---  ENET_CMD <= '0';
---  ENET_CS_N <= '1';
---  ENET_WR_N <= '1';
---  ENET_RD_N <= '1';
---  ENET_RST_N <= '1';
---  ENET_CLK <= '0';
---
---  AUD_DACDAT <= '0';
---  AUD_XCK <= '0';
---
---  TD_RESET <= '0';
---
---  -- Set all bidirectional ports to tri-state
---  FL_DQ       <= (others => 'Z');
---  SRAM_DQ(15 downto 8) <= (others => 'Z');
---  OTG_DATA    <= (others => 'Z');
---  LCD_DATA    <= (others => 'Z');
---  I2C_SDAT    <= 'Z';
---  ENET_DATA   <= (others => 'Z');
---  AUD_ADCLRCK <= 'Z';
---  AUD_DACLRCK <= 'Z';
---  AUD_BCLK    <= 'Z';
---  GPIO_0      <= (others => 'Z');
---  GPIO_1      <= (others => 'Z');
 
 end datapath;
