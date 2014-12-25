@@ -78,6 +78,7 @@ port (
 	CLOCK_27	:	in	std_logic_vector(1 downto 0);
 	CLOCK_50	:	in	std_logic;
 	EXT_CLOCK	:	in	std_logic;
+  RESET_L   : in  std_logic;
 	
 	-- Switches
 	SW			:	in	std_logic_vector(9 downto 0);
@@ -130,19 +131,19 @@ port (
 	SRAM_UB_N	:	out		std_logic;
 	SRAM_LB_N	:	out		std_logic;
 	
-	-- SDRAM
-	DRAM_ADDR	:	out		std_logic_vector(11 downto 0);
-	DRAM_DQ		:	inout	std_logic_vector(15 downto 0);
-	DRAM_BA_0	:	in		std_logic;
-	DRAM_BA_1	:	in		std_logic;
-	DRAM_CAS_N	:	in		std_logic;
-	DRAM_CKE	:	in		std_logic;
-	DRAM_CLK	:	in		std_logic;
-	DRAM_CS_N	:	in		std_logic;
-	DRAM_LDQM	:	in		std_logic;
-	DRAM_RAS_N	:	in		std_logic;
-	DRAM_UDQM	:	in		std_logic;
-	DRAM_WE_N	:	in		std_logic;
+--	-- SDRAM
+--	DRAM_ADDR	:	out		std_logic_vector(11 downto 0);
+--	DRAM_DQ		:	inout	std_logic_vector(15 downto 0);
+--	DRAM_BA_0	:	in		std_logic;
+--	DRAM_BA_1	:	in		std_logic;
+--	DRAM_CAS_N	:	in		std_logic;
+--	DRAM_CKE	:	in		std_logic;
+--	DRAM_CLK	:	in		std_logic;
+--	DRAM_CS_N	:	in		std_logic;
+--	DRAM_LDQM	:	in		std_logic;
+--	DRAM_RAS_N	:	in		std_logic;
+--	DRAM_UDQM	:	in		std_logic;
+--	DRAM_WE_N	:	in		std_logic;
 	
 	-- Flash
 	FL_ADDR		:	out		std_logic_vector(21 downto 0);
@@ -169,16 +170,16 @@ architecture rtl of bbc_micro_de1 is
 ------------------------------
 -- PLL (32 MHz master clock)
 ------------------------------
+--component pll32 IS
+--	PORT
+--	(
+--		areset		: IN STD_LOGIC  := '0';
+--		inclk0		: IN STD_LOGIC  := '0';
+--		c0			: OUT STD_LOGIC ;
+--		locked		: OUT STD_LOGIC 
+--	);
+--end component;
 
-component pll32 IS
-	PORT
-	(
-		areset		: IN STD_LOGIC  := '0';
-		inclk0		: IN STD_LOGIC  := '0';
-		c0			: OUT STD_LOGIC ;
-		locked		: OUT STD_LOGIC 
-	);
-end component;
 
 ---------
 -- CPU
@@ -418,71 +419,71 @@ component sn76489_top is
 
 end component;
 
-component i2s_intf is
-generic(
-	mclk_rate : positive := 12000000;
-	sample_rate : positive := 8000;
-	preamble : positive := 1; -- I2S
-	word_length : positive := 16
-	);
-
-port (
-	-- 2x MCLK in (e.g. 24 MHz for WM8731 USB mode)
-	CLK			:	in	std_logic;
-	nRESET		:	in	std_logic;
-	
-	-- Parallel IO
-	PCM_INL		:	out	std_logic_vector(word_length - 1 downto 0);
-	PCM_INR		:	out	std_logic_vector(word_length - 1 downto 0);
-	PCM_OUTL	:	in	std_logic_vector(word_length - 1 downto 0);
-	PCM_OUTR	:	in	std_logic_vector(word_length - 1 downto 0);
-	
-	-- Codec interface (right justified mode)
-	-- MCLK is generated at half of the CLK input
-	I2S_MCLK	:	out	std_logic;
-	-- LRCLK is equal to the sample rate and is synchronous to
-	-- MCLK.  It must be related to MCLK by the oversampling ratio
-	-- given in the codec datasheet.
-	I2S_LRCLK	:	out	std_logic;
-	
-	-- Data is shifted out on the falling edge of BCLK, sampled
-	-- on the rising edge.  The bit rate is determined such that
-	-- it is fast enough to fit preamble + word_length bits into
-	-- each LRCLK half cycle.  The last cycle of each word may be 
-	-- stretched to fit to LRCLK.  This is OK at least for the 
-	-- WM8731 codec.
-	-- The first falling edge of each timeslot is always synchronised
-	-- with the LRCLK edge.
-	I2S_BCLK	:	out	std_logic;
-	-- Output bitstream
-	I2S_DOUT	:	out	std_logic;
-	-- Input bitstream
-	I2S_DIN		:	in	std_logic
-	);
-end component;
-
-component i2c_loader is
-generic (
-	-- Address of slave to be loaded
-	device_address : integer := 16#1a#;
-	-- Number of retries to allow before stopping
-	num_retries : integer := 0;
-	-- Length of clock divider in bits.  Resulting bus frequency is
-	-- CLK/2^(log2_divider + 2)
-	log2_divider : integer := 6
-);
-
-port (
-	CLK			:	in	std_logic;
-	nRESET		:	in	std_logic;
-	
-	I2C_SCL		:	inout	std_logic;
-	I2C_SDA		:	inout	std_logic;
-	
-	IS_DONE		:	out std_logic;
-	IS_ERROR	:	out	std_logic
-	);
-end component;
+--component i2s_intf is
+--generic(
+--	mclk_rate : positive := 12000000;
+--	sample_rate : positive := 8000;
+--	preamble : positive := 1; -- I2S
+--	word_length : positive := 16
+--	);
+--
+--port (
+--	-- 2x MCLK in (e.g. 24 MHz for WM8731 USB mode)
+--	CLK			:	in	std_logic;
+--	nRESET		:	in	std_logic;
+--	
+--	-- Parallel IO
+--	PCM_INL		:	out	std_logic_vector(word_length - 1 downto 0);
+--	PCM_INR		:	out	std_logic_vector(word_length - 1 downto 0);
+--	PCM_OUTL	:	in	std_logic_vector(word_length - 1 downto 0);
+--	PCM_OUTR	:	in	std_logic_vector(word_length - 1 downto 0);
+--	
+--	-- Codec interface (right justified mode)
+--	-- MCLK is generated at half of the CLK input
+--	I2S_MCLK	:	out	std_logic;
+--	-- LRCLK is equal to the sample rate and is synchronous to
+--	-- MCLK.  It must be related to MCLK by the oversampling ratio
+--	-- given in the codec datasheet.
+--	I2S_LRCLK	:	out	std_logic;
+--	
+--	-- Data is shifted out on the falling edge of BCLK, sampled
+--	-- on the rising edge.  The bit rate is determined such that
+--	-- it is fast enough to fit preamble + word_length bits into
+--	-- each LRCLK half cycle.  The last cycle of each word may be 
+--	-- stretched to fit to LRCLK.  This is OK at least for the 
+--	-- WM8731 codec.
+--	-- The first falling edge of each timeslot is always synchronised
+--	-- with the LRCLK edge.
+--	I2S_BCLK	:	out	std_logic;
+--	-- Output bitstream
+--	I2S_DOUT	:	out	std_logic;
+--	-- Input bitstream
+--	I2S_DIN		:	in	std_logic
+--	);
+--end component;
+--
+--component i2c_loader is
+--generic (
+--	-- Address of slave to be loaded
+--	device_address : integer := 16#1a#;
+--	-- Number of retries to allow before stopping
+--	num_retries : integer := 0;
+--	-- Length of clock divider in bits.  Resulting bus frequency is
+--	-- CLK/2^(log2_divider + 2)
+--	log2_divider : integer := 6
+--);
+--
+--port (
+--	CLK			:	in	std_logic;
+--	nRESET		:	in	std_logic;
+--	
+--	I2C_SCL		:	inout	std_logic;
+--	I2C_SDA		:	inout	std_logic;
+--	
+--	IS_DONE		:	out std_logic;
+--	IS_ERROR	:	out	std_logic
+--	);
+--end component;
 
 component debugger is
 generic (
@@ -718,11 +719,13 @@ begin
 	-------------------------
 
 	-- 32 MHz master clock
-	pll:	pll32 port map (
-		pll_reset,
-		CLOCK_24(0),
-		clock,
-		pll_locked );
+--	pll:	pll32 port map (
+--		pll_reset,
+--		CLOCK_24(0),
+--		clock,
+--		pll_locked );
+
+  clock <= EXT_CLOCK;
 		
 	-- Hardware debugger block (single-step, breakpoints)
 	debug:	debugger port map (
@@ -748,7 +751,7 @@ begin
 	cpu : T65 port map (
 		cpu_mode,
 		reset_n,
-		cpu_debug_clken,
+		cpu_clken, --cpu_debug_clken,
 		clock,
 		cpu_ready,
 		cpu_abort_n,
@@ -899,30 +902,31 @@ begin
 		sound_ready, sound_di,
 		sound_ao
 		);
-	i2s : i2s_intf port map (
-		CLOCK_24(0), reset_n,
-		pcm_inl, pcm_inr,
-		std_logic_vector(sound_ao) & "00000000",
-		std_logic_vector(sound_ao) & "00000000",
-		AUD_XCK, AUD_DACLRCK,
-		AUD_BCLK, AUD_DACDAT, AUD_ADCDAT
-		);
-	i2c : i2c_loader 
-		generic map (
-			log2_divider => 7
-		)
-		port map (
-			clock, reset_n,
-			I2C_SCLK, I2C_SDAT,
-			LEDR(5), -- IS_DONE
-			LEDR(4) -- IS_ERROR
-		);
+--	i2s : i2s_intf port map (
+--		CLOCK_24(0), reset_n,
+--		pcm_inl, pcm_inr,
+--		std_logic_vector(sound_ao) & "00000000",
+--		std_logic_vector(sound_ao) & "00000000",
+--		AUD_XCK, AUD_DACLRCK,
+--		AUD_BCLK, AUD_DACDAT, AUD_ADCDAT
+--		);
+--	i2c : i2c_loader 
+--		generic map (
+--			log2_divider => 7
+--		)
+--		port map (
+--			clock, reset_n,
+--			I2C_SCLK, I2C_SDAT,
+--			LEDR(5), -- IS_DONE
+--			LEDR(4) -- IS_ERROR
+--		);
 	
 	-- Asynchronous reset
 	-- PLL is reset by external reset switch
 	pll_reset <= not SW(9);
 	-- Keyboard and System VIA are reset by external reset switch or PLL being out of lock
-	hard_reset_n <= not (pll_reset or not pll_locked);
+	--hard_reset_n <= not (pll_reset or not pll_locked);
+  hard_reset_n <= RESET_L;
 	-- Rest of system is reset by all of the above plus the keyboard BREAK key
 	reset_n <= hard_reset_n and not keyb_break;
 		
