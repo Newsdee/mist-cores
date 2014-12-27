@@ -928,7 +928,7 @@ begin
 	--hard_reset_n <= not (pll_reset or not pll_locked);
   hard_reset_n <= RESET_L;
 	-- Rest of system is reset by all of the above plus the keyboard BREAK key
-	reset_n <= hard_reset_n and not keyb_break;
+	reset_n <= hard_reset_n ;--and not keyb_break;
 		
 	-- Clock enable generation - 32 MHz clock split into 32 cycles
 	-- CPU is on 0 and 16 (but can be masked by 1 MHz bus accesses)

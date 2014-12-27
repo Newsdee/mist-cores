@@ -381,6 +381,20 @@ begin
               oe => not sdram_oe_n,
               dout => sdram_do
     );
+
+--  ram_inst : entity work.spram
+--    generic map
+--    (
+--      widthad_a	=> 14
+--    )
+--    port map
+--    (
+--      clock	=> clk32m,
+--      address	=> sdram_addr(13 downto 0),
+--      wren	=> not sdram_we_n,
+--      data	=> sdram_di,
+--      q	=> sdram_do
+--    );
     
   bbc_sdram_dq(7 downto 0) <= sdram_do when sdram_we_n = '1' else "ZZZZZZZZ";
   sdram_di     <= bbc_sdram_dq(7 downto 0) when sdram_we_n = '0' else "ZZZZZZZZ";
@@ -497,27 +511,27 @@ begin
       serial_strobe => par_out_strobe
   );
   
---  sd_card_d: component sd_card
---    port map
---    (
---      -- connection to io controller
---      io_lba => sd_lba,
---      io_rd => sd_rd,
---      io_wr => sd_wr,
---      io_ack => sd_ack,
---      io_conf => sd_conf,
---      io_sdhc => sd_sdhc,
---      io_din => sd_data_in,
---      io_din_strobe => sd_data_in_strobe,
---      io_dout => sd_data_out,
---      io_dout_strobe => sd_data_out_strobe,
---      allow_sdhc => '0', -- BBC does not support SDHC
---      -- connection to host
---      sd_cs => sd_cs,
---      sd_sck => sd_sck,
---      sd_sdi => sd_sdi,
---      sd_sdo => sd_sdo
---    );
+  sd_card_d: component sd_card
+    port map
+    (
+      -- connection to io controller
+      io_lba => sd_lba,
+      io_rd => sd_rd,
+      io_wr => sd_wr,
+      io_ack => sd_ack,
+      io_conf => sd_conf,
+      io_sdhc => sd_sdhc,
+      io_din => sd_data_in,
+      io_din_strobe => sd_data_in_strobe,
+      io_dout => sd_data_out,
+      io_dout_strobe => sd_data_out_strobe,
+      allow_sdhc => '0', -- BBC does not support SDHC
+      -- connection to host
+      sd_cs => sd_cs,
+      sd_sck => sd_sck,
+      sd_sdi => sd_sdi,
+      sd_sdo => sd_sdo
+    );
     
   -- Joystick
 
