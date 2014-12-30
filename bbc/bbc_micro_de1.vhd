@@ -130,6 +130,7 @@ port (
 	SRAM_WE_N	:	out		std_logic;
 	SRAM_UB_N	:	out		std_logic;
 	SRAM_LB_N	:	out		std_logic;
+  SRAM_CLK  : out   std_logic;
 	
 --	-- SDRAM
 --	DRAM_ADDR	:	out		std_logic_vector(11 downto 0);
@@ -147,7 +148,7 @@ port (
 	
 	-- Flash
 	FL_ADDR		:	out		std_logic_vector(21 downto 0);
-	FL_DQ		:	inout	std_logic_vector(7 downto 0);
+	FL_DQ		  :	in	std_logic_vector(7 downto 0);
 	FL_RST_N	:	out		std_logic;
 	FL_OE_N		:	out		std_logic;
 	FL_WE_N		:	out		std_logic;
@@ -710,6 +711,8 @@ signal tube_enable		:	std_logic;		-- 0xFEE0-FEFF
 
 -- ROM select latch
 signal romsel			:	std_logic_vector(3 downto 0);
+signal basic_dq : std_logic_vector(7 downto 0);
+signal os_dq    : std_logic_vector(7 downto 0);
 
 signal mhz1_enable		:	std_logic;		-- Set for access to any 1 MHz peripheral
 
@@ -751,7 +754,7 @@ begin
 	cpu : T65 port map (
 		cpu_mode,
 		reset_n,
-		cpu_clken, --cpu_debug_clken,
+		cpu_debug_clken,
 		clock,
 		cpu_ready,
 		cpu_abort_n,
@@ -928,7 +931,7 @@ begin
 	--hard_reset_n <= not (pll_reset or not pll_locked);
   hard_reset_n <= RESET_L;
 	-- Rest of system is reset by all of the above plus the keyboard BREAK key
-	reset_n <= hard_reset_n ;--and not keyb_break;
+	reset_n <= hard_reset_n and not keyb_break;
 		
 	-- Clock enable generation - 32 MHz clock split into 32 cycles
 	-- CPU is on 0 and 16 (but can be masked by 1 MHz bus accesses)
@@ -940,6 +943,8 @@ begin
 	mhz1_clken <= mhz2_clken and clken_counter(4); -- 31
 	cpu_cycle <= not (clken_counter(0) or clken_counter(1) or clken_counter(2) or clken_counter(3)); -- 0/16
 	cpu_clken <= cpu_cycle and not cpu_cycle_mask;
+  
+  SRAM_CLK <= vid_clken;
 	
 	clk_gen: process(clock,reset_n)
 	begin
@@ -1098,7 +1103,7 @@ begin
 	FL_ADDR(16 downto 14) <=
 		"111" when mos_enable = '1' else
 		"0" & romsel(1 downto 0);
-	FL_ADDR(13 downto 0) <= cpu_a(13 downto 0);		
+	FL_ADDR(13 downto 0) <= cpu_a(13 downto 0);
 		
 	-- SRAM bus
 	SRAM_UB_N <= '1';

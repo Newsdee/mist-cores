@@ -81,6 +81,7 @@ architecture rtl of bbc_mist is
   signal clk16m: std_logic := '0';
   signal clk12k : std_logic := '0';
   signal pll_locked : std_logic := '0';
+  signal sram_clk : std_logic;
   
   signal reset    : std_logic;
   signal audio    : std_logic;
@@ -162,6 +163,12 @@ architecture rtl of bbc_mist is
   signal audio_pwm : std_logic;
   
   signal flash_clk : unsigned(22 downto 0) := (others => '0');
+  
+  signal video_r_x2         : std_logic_vector(3 downto 0);
+  signal video_g_x2         : std_logic_vector(3 downto 0);
+  signal video_b_x2         : std_logic_vector(3 downto 0);
+  signal hsync_x2           : std_logic;
+  signal vsync_x2           : std_logic;
 
   -- config string used by the io controller to fill the OSD
   constant CONF_STR : string := "BBC;PRG;";
@@ -327,6 +334,7 @@ begin
       SRAM_DQ   => bbc_sdram_dq,
       SRAM_OE_N => sdram_oe_n,
       SRAM_WE_N => sdram_we_n,
+      SRAM_CLK  => sram_clk,
       
       FL_ADDR   => fl_addr,
       FL_DQ     => fl_dq,
@@ -345,17 +353,39 @@ begin
       sdi => SPI_DI,
       sck => SPI_SCK,
       ss => SPI_SS3,
-      red_in => VGA_R_O & "00",
-      green_in => VGA_G_O & "00",
-      blue_in => VGA_B_O & "00",
-      hs_in => VGA_HS_O,
-      vs_in => VGA_VS_O,
+      red_in => video_r_x2 & "00",
+      green_in => video_g_x2 & "00",
+      blue_in => video_b_x2 & "00",
+      hs_in => hsync_x2,
+      vs_in => vsync_x2,
       scanline_ena_h => '0', --status(2),
       red_out => VGA_R,
       green_out => VGA_G,
       blue_out => VGA_B,
       hs_out => VGA_HS,
       vs_out => VGA_VS
+    );
+    
+  --
+  -- scan doubler
+  --
+  u_dblscan : entity work.VIC20_DBLSCAN
+    port map (
+      I_R               => VGA_R_O,
+      I_G               => VGA_G_O,
+      I_B               => VGA_B_O,
+      I_HSYNC           => VGA_HS_O,
+      I_VSYNC           => VGA_VS_O,
+      --
+      O_R               => video_r_x2,
+      O_G               => video_g_x2,
+      O_B               => video_b_x2,
+      O_HSYNC           => hsync_x2,
+      O_VSYNC           => vsync_x2,
+      --
+      ENA_X2            => '1',
+      ENA               => clk16m,
+      CLK               => clk32m
     );
     
   -- sdram interface
@@ -373,7 +403,7 @@ begin
               sd_ras => SDRAM_nRAS,
               sd_cas => SDRAM_nCAS,
               clk => clk96m,
-              clkref => clk32m,
+              clkref => sram_clk,
               init => not pll_locked,
               din => sdram_di,
               addr => "0000000" & sdram_addr,
@@ -389,7 +419,7 @@ begin
 --    )
 --    port map
 --    (
---      clock	=> clk32m,
+--      clock	=> clk16m,
 --      address	=> sdram_addr(13 downto 0),
 --      wren	=> not sdram_we_n,
 --      data	=> sdram_di,
@@ -426,7 +456,7 @@ begin
     );
 
   fl_dq <= os_dq    when fl_addr(16 downto 14) = "111" else
-           mmc_dq   when fl_addr(16 downto 14) = "010" else
+          -- mmc_dq   when fl_addr(16 downto 14) = "010" else
            basic_dq when fl_addr(16 downto 14) = "011" else
            "ZZZZZZZZ";
 
